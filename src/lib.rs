@@ -1,5 +1,3 @@
-pub use fbthrift;
-
 cfg_if::cfg_if! {
     if #[cfg(all(feature = "futures_io", not(feature = "tokio_io")))] {
         pub mod transport;

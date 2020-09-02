@@ -126,6 +126,7 @@ where
             this.state = CallState::Writed;
         }
 
+        // TODO, loop
         let mut res_buf = vec![0u8; configuration.get_buf_size()];
         let mut read_future =
             stream.read_with_timeout(&mut res_buf, configuration.get_read_timeout());

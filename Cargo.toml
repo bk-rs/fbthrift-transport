@@ -9,7 +9,7 @@ repository = "https://github.com/bk-rs/fbthrift-transport"
 homepage = "https://github.com/bk-rs/fbthrift-transport"
 documentation = "https://docs.rs/fbthrift-transport"
 keywords = []
-categories = ["fbthrift"]
+categories = []
 readme = "README.md"
 
 [features]

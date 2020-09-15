@@ -4,8 +4,8 @@
 
 
 ```
-apt install cmake
-apt install build-essential
+sudo apt install -y cmake
+sudo apt install -y build-essential
 ```
 
 ### fmt
@@ -13,43 +13,47 @@ apt install build-essential
 ```
 cd
 git clone https://github.com/fmtlib/fmt.git && cd fmt
-mkdir _build && cd _build
+mkdir build && cd build
 cmake ..
 make -j$(nproc)
 sudo make install
+cd
 ```
 
 ### folly
 
 ```
-apt install libboost-all-dev
-apt install libssl-dev
-apt install libdouble-conversion-dev
-apt install libgoogle-glog-dev
+sudo apt install -y libboost-all-dev
+sudo apt install -y libssl-dev
+sudo apt install -y libdouble-conversion-dev
+sudo apt install -y libgoogle-glog-dev
 ```
 
 ```
 cd
-git clone git@github.com:facebook/folly.git && cd folly
-mkdir _build && cd _build
+git clone https://github.com/facebook/folly.git && cd folly
+mkdir build && cd build
 cmake ..
 make -j $(nproc)
 sudo make install
+cd
 ```
 
 ### fizz
 
 ```
-apt install libsodium-dev
+sudo apt install -y libsodium-dev
+sudo apt install -y libgmock-dev
 ```
 
 ```
 cd
 git clone https://github.com/facebookincubator/fizz && cd fizz/fizz
-mkdir _build && cd _build
+mkdir build && cd build
 cmake ..
 make -j $(nproc)
 sudo make install
+cd
 ```
 
 ### wangle
@@ -57,26 +61,28 @@ sudo make install
 ```
 cd
 git clone https://github.com/facebook/wangle.git && cd wangle/wangle
-mkdir _build && cd _build
+mkdir build && cd build
 cmake ..
 make -j $(nproc)
 sudo make install
+cd
 ```
 
 ### fbthrift
 
 ```
-apt install libbison-dev
-apt install libfl-dev
-apt install libzstd-dev
+sudo apt install -y libbison-dev
+sudo apt install -y libfl-dev
+sudo apt install -y libzstd-dev
 ```
 
 ```
 cd
 git clone https://github.com/facebook/fbthrift && cd fbthrift
-git checkout v2020.08.31.00
+git checkout v2020.09.14.00
 cd build
 cmake ..
 make -j $(nproc)
 sudo make install
+cd
 ```

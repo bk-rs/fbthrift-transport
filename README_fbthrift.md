@@ -80,7 +80,7 @@ sudo apt install -y libzstd-dev
 cd
 git clone https://github.com/facebook/fbthrift && cd fbthrift
 git checkout v2020.09.14.00
-cd build
+mkdir _build && cd _build
 cmake ..
 make -j $(nproc)
 sudo make install

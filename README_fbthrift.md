@@ -32,7 +32,7 @@ sudo apt install -y libgoogle-glog-dev
 ```
 cd
 git clone https://github.com/facebook/folly.git && cd folly
-mkdir build && cd build
+mkdir _build && cd _build
 cmake ..
 make -j $(nproc)
 sudo make install

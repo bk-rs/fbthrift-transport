@@ -11,9 +11,9 @@ sudo apt install -y build-essential
 ### fmt
 
 ```
-cd
+cd /usr/local/src
 git clone https://github.com/fmtlib/fmt.git && cd fmt
-mkdir build && cd build
+mkdir _build && cd _build
 cmake ..
 make -j$(nproc)
 sudo make install
@@ -30,7 +30,7 @@ sudo apt install -y libgoogle-glog-dev
 ```
 
 ```
-cd
+cd /usr/local/src
 git clone https://github.com/facebook/folly.git && cd folly
 mkdir _build && cd _build
 cmake ..
@@ -47,9 +47,9 @@ sudo apt install -y libgmock-dev
 ```
 
 ```
-cd
+cd /usr/local/src
 git clone https://github.com/facebookincubator/fizz && cd fizz/fizz
-mkdir build && cd build
+mkdir _build && cd _build
 cmake ..
 make -j $(nproc)
 sudo make install
@@ -59,9 +59,9 @@ cd
 ### wangle
 
 ```
-cd
+cd /usr/local/src
 git clone https://github.com/facebook/wangle.git && cd wangle/wangle
-mkdir build && cd build
+mkdir _build && cd _build
 cmake ..
 make -j $(nproc)
 sudo make install
@@ -77,7 +77,7 @@ sudo apt install -y libzstd-dev
 ```
 
 ```
-cd
+cd /usr/local/src
 git clone https://github.com/facebook/fbthrift && cd fbthrift
 git checkout v2020.09.14.00
 mkdir _build && cd _build

@@ -152,7 +152,7 @@ where
             this.state = CallState::Writed;
         }
 
-        let (identity, res_buf) = configuration
+        let (name, res_buf) = configuration
             .response_handler
             .try_make_response_bytes(req.bytes())?;
         if let Some(res_buf) = res_buf {
@@ -170,7 +170,7 @@ where
 
             if let Some(n) = configuration
                 .response_handler
-                .parse_response_bytes(identity.clone(), &buf_storage)?
+                .parse_response_bytes(&name, &buf_storage)?
             {
                 n_de = n;
                 break;
@@ -207,9 +207,9 @@ mod tests {
             fn try_make_response_bytes(
                 &self,
                 request_bytes: &[u8],
-            ) -> io::Result<(&str, Option<Vec<u8>>)> {
+            ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)> {
                 Ok((
-                    "",
+                    b"".to_vec(),
                     if request_bytes == b"static" {
                         Some(b"bar".to_vec())
                     } else {
@@ -220,7 +220,7 @@ mod tests {
 
             fn parse_response_bytes(
                 &self,
-                _identity: &str,
+                _name: &[u8],
                 _response_bytes: &[u8],
             ) -> io::Result<Option<usize>> {
                 unimplemented!()
@@ -255,9 +255,9 @@ mod tests {
             fn try_make_response_bytes(
                 &self,
                 request_bytes: &[u8],
-            ) -> io::Result<(&str, Option<Vec<u8>>)> {
+            ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)> {
                 Ok((
-                    "id1",
+                    b"id1".to_vec(),
                     if request_bytes == b"dynamic" {
                         None
                     } else {
@@ -268,10 +268,10 @@ mod tests {
 
             fn parse_response_bytes(
                 &self,
-                identity: &str,
+                name: &[u8],
                 response_bytes: &[u8],
             ) -> io::Result<Option<usize>> {
-                if identity == "id1" && response_bytes == b"89012" {
+                if name == b"id1" && response_bytes == b"89012" {
                     Ok(Some(2))
                 } else {
                     unimplemented!()
@@ -307,9 +307,9 @@ mod tests {
             fn try_make_response_bytes(
                 &self,
                 request_bytes: &[u8],
-            ) -> io::Result<(&str, Option<Vec<u8>>)> {
+            ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)> {
                 Ok((
-                    "id1",
+                    b"id1".to_vec(),
                     if request_bytes == b"dynamic" {
                         None
                     } else {
@@ -320,10 +320,10 @@ mod tests {
 
             fn parse_response_bytes(
                 &self,
-                identity: &str,
+                name: &[u8],
                 response_bytes: &[u8],
             ) -> io::Result<Option<usize>> {
-                if identity == "id1" {
+                if name == b"id1" {
                     if response_bytes == b"8" {
                         Ok(None)
                     } else if response_bytes == b"89" {
@@ -372,9 +372,9 @@ mod tests {
             fn try_make_response_bytes(
                 &self,
                 request_bytes: &[u8],
-            ) -> io::Result<(&str, Option<Vec<u8>>)> {
+            ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)> {
                 Ok((
-                    "id1",
+                    b"id1".to_vec(),
                     if request_bytes == b"dynamic" {
                         None
                     } else {
@@ -385,10 +385,10 @@ mod tests {
 
             fn parse_response_bytes(
                 &self,
-                identity: &str,
+                name: &[u8],
                 response_bytes: &[u8],
             ) -> io::Result<Option<usize>> {
-                if identity == "id1" {
+                if name == b"id1" {
                     if response_bytes == b"8" {
                         Ok(None)
                     } else if response_bytes == b"89" {

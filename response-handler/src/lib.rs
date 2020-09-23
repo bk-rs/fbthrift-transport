@@ -1,13 +1,13 @@
 use std::io;
 
 pub trait ResponseHandler: Clone {
-    fn try_make_response_bytes(&self, request_bytes: &[u8]) -> io::Result<(&str, Option<Vec<u8>>)>;
-
-    fn parse_response_bytes(
+    fn try_make_response_bytes(
         &self,
-        identity: &str,
-        response_bytes: &[u8],
-    ) -> io::Result<Option<usize>>;
+        request_bytes: &[u8],
+    ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)>;
+
+    fn parse_response_bytes(&self, name: &[u8], response_bytes: &[u8])
+        -> io::Result<Option<usize>>;
 }
 
 #[derive(Clone)]
@@ -17,13 +17,13 @@ impl ResponseHandler for DefaultResponseHandler {
     fn try_make_response_bytes(
         &self,
         _request_bytes: &[u8],
-    ) -> io::Result<(&str, Option<Vec<u8>>)> {
-        Ok(("", None))
+    ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)> {
+        Ok((vec![], None))
     }
 
     fn parse_response_bytes(
         &self,
-        _identity: &str,
+        _name: &[u8],
         response_bytes: &[u8],
     ) -> io::Result<Option<usize>> {
         Ok(Some(response_bytes.len()))
@@ -42,13 +42,13 @@ mod tests {
 
         match h.try_make_response_bytes(&b""[..]) {
             Ok((i, res_buf)) => {
-                assert_eq!(i, "");
+                assert_eq!(i, b"");
                 assert_eq!(res_buf, None);
             }
             Err(err) => assert!(false, err),
         }
 
-        match h.parse_response_bytes("", &b"foo"[..]) {
+        match h.parse_response_bytes(b"", &b"foo"[..]) {
             Ok(n) => {
                 assert_eq!(n, Some(3));
             }

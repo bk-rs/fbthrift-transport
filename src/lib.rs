@@ -10,3 +10,5 @@ cfg_if::cfg_if! {
 
 pub mod configuration;
 pub use configuration::{AsyncTransportConfiguration, DefaultAsyncTransportConfiguration};
+
+pub use fbthrift_transport_response_handler;

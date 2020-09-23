@@ -13,25 +13,23 @@ use futures_x_io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use futures_x_io_timeoutable::AsyncReadWithTimeoutExt;
 
 use crate::configuration::AsyncTransportConfiguration;
+use fbthrift_transport_response_handler::ResponseHandler;
 
-pub struct AsyncTransport<S, I, FDQ, FDS>
+pub struct AsyncTransport<S, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
-    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)>,
-    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>>,
+    H: ResponseHandler,
 {
     stream: Arc<Mutex<S>>,
-    configuration: AsyncTransportConfiguration<I, FDQ, FDS>,
+    configuration: AsyncTransportConfiguration<H>,
 }
 
-impl<S, I, FDQ, FDS> AsyncTransport<S, I, FDQ, FDS>
+impl<S, H> AsyncTransport<S, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
-    I: Unpin,
-    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)> + Unpin,
-    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>> + Unpin,
+    H: ResponseHandler + Unpin,
 {
-    pub fn new(stream: S, configuration: AsyncTransportConfiguration<I, FDQ, FDS>) -> Self {
+    pub fn new(stream: S, configuration: AsyncTransportConfiguration<H>) -> Self {
         Self {
             stream: Arc::new(Mutex::new(stream)),
             configuration,
@@ -39,11 +37,10 @@ where
     }
 }
 
-impl<S, I, FDQ, FDS> Framing for AsyncTransport<S, I, FDQ, FDS>
+impl<S, H> Framing for AsyncTransport<S, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
-    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)>,
-    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>>,
+    H: ResponseHandler,
 {
     type EncBuf = BytesMut;
     type DecBuf = Cursor<Bytes>;
@@ -56,12 +53,10 @@ where
     fn get_meta(&self) {}
 }
 
-impl<S, I, FDQ, FDS> Transport for AsyncTransport<S, I, FDQ, FDS>
+impl<S, H> Transport for AsyncTransport<S, H>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
-    I: Clone + Unpin + Send + 'static,
-    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)> + Clone + Unpin + Send + 'static,
-    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>> + Clone + Unpin + Send + 'static,
+    H: ResponseHandler + Unpin + Send + 'static,
 {
     fn call(
         &self,
@@ -82,30 +77,28 @@ enum CallState {
     Writed,
 }
 
-struct Call<S, I, FDQ, FDS>
+struct Call<S, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
-    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)>,
-    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>>,
+    H: ResponseHandler,
 {
     stream: Arc<Mutex<S>>,
-    req: FramingEncodedFinal<AsyncTransport<S, I, FDQ, FDS>>,
-    configuration: AsyncTransportConfiguration<I, FDQ, FDS>,
+    req: FramingEncodedFinal<AsyncTransport<S, H>>,
+    configuration: AsyncTransportConfiguration<H>,
     //
     state: CallState,
     buf_storage: Vec<u8>,
 }
 
-impl<S, I, FDQ, FDS> Call<S, I, FDQ, FDS>
+impl<S, H> Call<S, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
-    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)>,
-    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>>,
+    H: ResponseHandler,
 {
     fn new(
         stream: Arc<Mutex<S>>,
-        req: FramingEncodedFinal<AsyncTransport<S, I, FDQ, FDS>>,
-        configuration: AsyncTransportConfiguration<I, FDQ, FDS>,
+        req: FramingEncodedFinal<AsyncTransport<S, H>>,
+        configuration: AsyncTransportConfiguration<H>,
     ) -> Self {
         let max_buf_size = configuration.get_max_buf_size();
 
@@ -119,14 +112,12 @@ where
     }
 }
 
-impl<S, I, FDQ, FDS> Future for Call<S, I, FDQ, FDS>
+impl<S, H> Future for Call<S, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
-    I: Clone + Unpin,
-    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)> + Clone + Unpin,
-    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>> + Clone + Unpin,
+    H: ResponseHandler + Unpin,
 {
-    type Output = Result<FramingDecoded<AsyncTransport<S, I, FDQ, FDS>>, anyhow::Error>;
+    type Output = Result<FramingDecoded<AsyncTransport<S, H>>, anyhow::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let this = self.get_mut();
@@ -149,7 +140,9 @@ where
             this.state = CallState::Writed;
         }
 
-        let (identity, res_buf) = (configuration.de_req_bytes)(req.bytes())?;
+        let (identity, res_buf) = configuration
+            .response_handler
+            .try_make_response_bytes(req.bytes())?;
         if let Some(res_buf) = res_buf {
             debug_assert!(buf_storage.is_empty(), "buf_storage should empty");
             return Poll::Ready(Ok(Cursor::new(Bytes::from(res_buf))));
@@ -163,7 +156,10 @@ where
             let n = ready!(Pin::new(&mut read_future).poll(cx))?;
             buf_storage.extend_from_slice(&buf[..n]);
 
-            if let Some(n) = (configuration.de_res_bytes)(identity.clone(), &buf_storage)? {
+            if let Some(n) = configuration
+                .response_handler
+                .parse_response_bytes(identity.clone(), &buf_storage)?
+            {
                 n_de = n;
                 break;
             } else {
@@ -192,23 +188,38 @@ mod tests {
 
     #[test]
     fn call_with_static_res() -> io::Result<()> {
+        #[derive(Clone)]
+        pub struct FooResponseHandler;
+
+        impl ResponseHandler for FooResponseHandler {
+            fn try_make_response_bytes(
+                &self,
+                request_bytes: &[u8],
+            ) -> io::Result<(&str, Option<Vec<u8>>)> {
+                Ok((
+                    "",
+                    if request_bytes == b"static" {
+                        Some(b"bar".to_vec())
+                    } else {
+                        None
+                    },
+                ))
+            }
+
+            fn parse_response_bytes(
+                &self,
+                _identity: &str,
+                _response_bytes: &[u8],
+            ) -> io::Result<Option<usize>> {
+                unimplemented!()
+            }
+        }
+
         block_on(async {
             let mut buf = b"1234567890".to_vec();
             let cursor = Cursor::new(&mut buf);
             let stream = Arc::new(Mutex::new(cursor));
-            let c = AsyncTransportConfiguration::new(
-                |bytes| {
-                    Ok((
-                        "",
-                        if bytes == b"static" {
-                            Some(b"bar".to_vec())
-                        } else {
-                            None
-                        },
-                    ))
-                },
-                |_, _| unimplemented!(),
-            );
+            let c = AsyncTransportConfiguration::new(FooResponseHandler);
 
             //
             let req = Bytes::from("static");
@@ -225,29 +236,42 @@ mod tests {
 
     #[test]
     fn call_with_dynamic_res() -> io::Result<()> {
+        #[derive(Clone)]
+        pub struct FooResponseHandler;
+
+        impl ResponseHandler for FooResponseHandler {
+            fn try_make_response_bytes(
+                &self,
+                request_bytes: &[u8],
+            ) -> io::Result<(&str, Option<Vec<u8>>)> {
+                Ok((
+                    "id1",
+                    if request_bytes == b"dynamic" {
+                        None
+                    } else {
+                        unimplemented!()
+                    },
+                ))
+            }
+
+            fn parse_response_bytes(
+                &self,
+                identity: &str,
+                response_bytes: &[u8],
+            ) -> io::Result<Option<usize>> {
+                if identity == "id1" && response_bytes == b"89012" {
+                    Ok(Some(2))
+                } else {
+                    unimplemented!()
+                }
+            }
+        }
+
         block_on(async {
             let mut buf = b"123456789012".to_vec();
             let cursor = Cursor::new(&mut buf);
             let stream = Arc::new(Mutex::new(cursor));
-            let c = AsyncTransportConfiguration::new(
-                |bytes| {
-                    Ok((
-                        "id1",
-                        if bytes == b"dynamic" {
-                            None
-                        } else {
-                            unimplemented!()
-                        },
-                    ))
-                },
-                |i, bytes| {
-                    if i == "id1" && bytes == b"89012" {
-                        Ok(Some(2))
-                    } else {
-                        unimplemented!()
-                    }
-                },
-            );
+            let c = AsyncTransportConfiguration::new(FooResponseHandler);
 
             //
             let req = Bytes::from("dynamic");
@@ -264,41 +288,54 @@ mod tests {
 
     #[test]
     fn call_with_dynamic_res_and_less_buf_size() -> io::Result<()> {
+        #[derive(Clone)]
+        pub struct FooResponseHandler;
+
+        impl ResponseHandler for FooResponseHandler {
+            fn try_make_response_bytes(
+                &self,
+                request_bytes: &[u8],
+            ) -> io::Result<(&str, Option<Vec<u8>>)> {
+                Ok((
+                    "id1",
+                    if request_bytes == b"dynamic" {
+                        None
+                    } else {
+                        unimplemented!()
+                    },
+                ))
+            }
+
+            fn parse_response_bytes(
+                &self,
+                identity: &str,
+                response_bytes: &[u8],
+            ) -> io::Result<Option<usize>> {
+                if identity == "id1" {
+                    if response_bytes == b"8" {
+                        Ok(None)
+                    } else if response_bytes == b"89" {
+                        Ok(None)
+                    } else if response_bytes == b"890" {
+                        Ok(None)
+                    } else if response_bytes == b"8901" {
+                        Ok(None)
+                    } else if response_bytes == b"89012" {
+                        Ok(Some(4))
+                    } else {
+                        unimplemented!()
+                    }
+                } else {
+                    unimplemented!()
+                }
+            }
+        }
+
         block_on(async {
             let mut buf = b"123456789012".to_vec();
             let cursor = Cursor::new(&mut buf);
             let stream = Arc::new(Mutex::new(cursor));
-            let mut c = AsyncTransportConfiguration::new(
-                |bytes| {
-                    Ok((
-                        "id1",
-                        if bytes == b"dynamic" {
-                            None
-                        } else {
-                            unimplemented!()
-                        },
-                    ))
-                },
-                |i, bytes| {
-                    if i == "id1" {
-                        if bytes == b"8" {
-                            Ok(None)
-                        } else if bytes == b"89" {
-                            Ok(None)
-                        } else if bytes == b"890" {
-                            Ok(None)
-                        } else if bytes == b"8901" {
-                            Ok(None)
-                        } else if bytes == b"89012" {
-                            Ok(Some(4))
-                        } else {
-                            unimplemented!()
-                        }
-                    } else {
-                        unimplemented!()
-                    }
-                },
-            );
+            let mut c = AsyncTransportConfiguration::new(FooResponseHandler);
             c.set_buf_size(1);
 
             //
@@ -316,41 +353,54 @@ mod tests {
 
     #[test]
     fn call_with_dynamic_res_and_less_max_buf_size() -> io::Result<()> {
+        #[derive(Clone)]
+        pub struct FooResponseHandler;
+
+        impl ResponseHandler for FooResponseHandler {
+            fn try_make_response_bytes(
+                &self,
+                request_bytes: &[u8],
+            ) -> io::Result<(&str, Option<Vec<u8>>)> {
+                Ok((
+                    "id1",
+                    if request_bytes == b"dynamic" {
+                        None
+                    } else {
+                        unimplemented!()
+                    },
+                ))
+            }
+
+            fn parse_response_bytes(
+                &self,
+                identity: &str,
+                response_bytes: &[u8],
+            ) -> io::Result<Option<usize>> {
+                if identity == "id1" {
+                    if response_bytes == b"8" {
+                        Ok(None)
+                    } else if response_bytes == b"89" {
+                        Ok(None)
+                    } else if response_bytes == b"890" {
+                        Ok(None)
+                    } else if response_bytes == b"8901" {
+                        Ok(None)
+                    } else if response_bytes == b"89012" {
+                        Ok(Some(4))
+                    } else {
+                        unimplemented!()
+                    }
+                } else {
+                    unimplemented!()
+                }
+            }
+        }
+
         block_on(async {
             let mut buf = b"123456789012".to_vec();
             let cursor = Cursor::new(&mut buf);
             let stream = Arc::new(Mutex::new(cursor));
-            let mut c = AsyncTransportConfiguration::new(
-                |bytes| {
-                    Ok((
-                        "id1",
-                        if bytes == b"dynamic" {
-                            None
-                        } else {
-                            unimplemented!()
-                        },
-                    ))
-                },
-                |i, bytes| {
-                    if i == "id1" {
-                        if bytes == b"8" {
-                            Ok(None)
-                        } else if bytes == b"89" {
-                            Ok(None)
-                        } else if bytes == b"890" {
-                            Ok(None)
-                        } else if bytes == b"8901" {
-                            Ok(None)
-                        } else if bytes == b"89012" {
-                            Ok(Some(4))
-                        } else {
-                            unimplemented!()
-                        }
-                    } else {
-                        unimplemented!()
-                    }
-                },
-            );
+            let mut c = AsyncTransportConfiguration::new(FooResponseHandler);
             c.set_buf_size(1);
             c.set_max_buf_size(3);
 

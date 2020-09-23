@@ -1,31 +1,28 @@
-use std::io;
 use std::time::Duration;
 
+use fbthrift_transport_response_handler::{DefaultResponseHandler, ResponseHandler};
+
 #[derive(Clone)]
-pub struct AsyncTransportConfiguration<I, FDQ, FDS>
+pub struct AsyncTransportConfiguration<H>
 where
-    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)>,
-    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>>,
+    H: ResponseHandler,
 {
     buf_size: Option<usize>,
     max_buf_size: Option<usize>,
     read_timeout: Option<Duration>,
-    pub(crate) de_req_bytes: FDQ,
-    pub(crate) de_res_bytes: FDS,
+    pub(crate) response_handler: H,
 }
 
-impl<I, FDQ, FDS> AsyncTransportConfiguration<I, FDQ, FDS>
+impl<H> AsyncTransportConfiguration<H>
 where
-    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)>,
-    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>>,
+    H: ResponseHandler,
 {
-    pub fn new(de_req_bytes: FDQ, de_res_bytes: FDS) -> Self {
+    pub fn new(response_handler: H) -> Self {
         Self {
             buf_size: None,
             max_buf_size: None,
             read_timeout: None,
-            de_req_bytes,
-            de_res_bytes,
+            response_handler,
         }
     }
 
@@ -54,32 +51,26 @@ where
     }
 }
 
+pub type DefaultAsyncTransportConfiguration = AsyncTransportConfiguration<DefaultResponseHandler>;
+
+impl Default for DefaultAsyncTransportConfiguration {
+    fn default() -> Self {
+        Self::new(DefaultResponseHandler)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use std::io;
+
     #[test]
-    fn with_new() -> io::Result<()> {
-        let c =
-            AsyncTransportConfiguration::new(|_| Ok(("", None)), |_, bytes| Ok(Some(bytes.len())));
+    fn with_default() -> io::Result<()> {
+        let c: DefaultAsyncTransportConfiguration = Default::default();
 
         assert_eq!(c.get_buf_size(), 1024);
         assert_eq!(c.get_read_timeout(), Duration::from_secs(5));
-
-        match (c.de_req_bytes)(&b""[..]) {
-            Ok((i, res_buf)) => {
-                assert_eq!(i, "");
-                assert_eq!(res_buf, None);
-            }
-            Err(err) => assert!(false, err),
-        }
-
-        match (c.de_res_bytes)("", &b"foo"[..]) {
-            Ok(n) => {
-                assert_eq!(n, Some(3));
-            }
-            Err(err) => assert!(false, err),
-        }
 
         Ok(())
     }

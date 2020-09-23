@@ -9,4 +9,4 @@ cfg_if::cfg_if! {
 }
 
 pub mod configuration;
-pub use configuration::AsyncTransportConfiguration;
+pub use configuration::{AsyncTransportConfiguration, DefaultAsyncTransportConfiguration};

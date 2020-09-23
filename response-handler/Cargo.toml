@@ -1,0 +1,15 @@
+[package]
+name = "fbthrift-transport-response-handler"
+version = "0.1.0"
+authors = ["vkill <vkill.net@gmail.com>"]
+edition = "2018"
+description = "fbthrift transport response handler."
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/bk-rs/fbthrift-transport"
+homepage = "https://github.com/bk-rs/fbthrift-transport"
+documentation = "https://docs.rs/fbthrift-transport-response-handler"
+keywords = []
+categories = []
+readme = "README.md"
+
+[dependencies]

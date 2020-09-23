@@ -25,3 +25,6 @@ futures-core = { version = "0.3", default-features = false, features = [] }
 
 futures-x-io = { version = "0.1", default-features = false, features = [], optional = true }
 futures-x-io-timeoutable = { version = "0.1", default-features = false, features = [], optional = true }
+
+[dev-dependencies]
+futures-lite = { version = "1.8"}

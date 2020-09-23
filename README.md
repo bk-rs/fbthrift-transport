@@ -20,5 +20,5 @@ cargo fmt --all -- --check
 
 ```
 cargo build-all-features
-cargo test-all-features
+cargo test-all-features -- --nocapture
 ```

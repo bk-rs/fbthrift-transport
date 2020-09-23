@@ -4,7 +4,6 @@ use std::io::Cursor;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
-use std::time::Duration;
 
 use bytes::Buf;
 use bytes::{Bytes, BytesMut};
@@ -13,29 +12,38 @@ use futures_core::ready;
 use futures_x_io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use futures_x_io_timeoutable::AsyncReadWithTimeoutExt;
 
-pub struct AsyncTransport<S>
+use crate::configuration::AsyncTransportConfiguration;
+
+pub struct AsyncTransport<S, I, FDQ, FDS>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)>,
+    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>>,
 {
     stream: Arc<Mutex<S>>,
-    configuration: AsyncTransportConfiguration,
+    configuration: AsyncTransportConfiguration<I, FDQ, FDS>,
 }
 
-impl<S> AsyncTransport<S>
+impl<S, I, FDQ, FDS> AsyncTransport<S, I, FDQ, FDS>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    I: Unpin,
+    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)> + Unpin,
+    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>> + Unpin,
 {
-    pub fn new(stream: S, configuration: Option<AsyncTransportConfiguration>) -> Self {
+    pub fn new(stream: S, configuration: AsyncTransportConfiguration<I, FDQ, FDS>) -> Self {
         Self {
             stream: Arc::new(Mutex::new(stream)),
-            configuration: configuration.unwrap_or_default(),
+            configuration,
         }
     }
 }
 
-impl<S> Framing for AsyncTransport<S>
+impl<S, I, FDQ, FDS> Framing for AsyncTransport<S, I, FDQ, FDS>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)>,
+    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>>,
 {
     type EncBuf = BytesMut;
     type DecBuf = Cursor<Bytes>;
@@ -48,9 +56,12 @@ where
     fn get_meta(&self) {}
 }
 
-impl<S> Transport for AsyncTransport<S>
+impl<S, I, FDQ, FDS> Transport for AsyncTransport<S, I, FDQ, FDS>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+    I: Clone + Unpin + Send + 'static,
+    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)> + Clone + Unpin + Send + 'static,
+    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>> + Clone + Unpin + Send + 'static,
 {
     fn call(
         &self,
@@ -71,40 +82,51 @@ enum CallState {
     Writed,
 }
 
-struct Call<S>
+struct Call<S, I, FDQ, FDS>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)>,
+    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>>,
 {
     stream: Arc<Mutex<S>>,
-    req: FramingEncodedFinal<AsyncTransport<S>>,
-    configuration: AsyncTransportConfiguration,
+    req: FramingEncodedFinal<AsyncTransport<S, I, FDQ, FDS>>,
+    configuration: AsyncTransportConfiguration<I, FDQ, FDS>,
     //
     state: CallState,
+    buf_storage: Vec<u8>,
 }
 
-impl<S> Call<S>
+impl<S, I, FDQ, FDS> Call<S, I, FDQ, FDS>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)>,
+    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>>,
 {
     fn new(
         stream: Arc<Mutex<S>>,
-        req: FramingEncodedFinal<AsyncTransport<S>>,
-        configuration: AsyncTransportConfiguration,
+        req: FramingEncodedFinal<AsyncTransport<S, I, FDQ, FDS>>,
+        configuration: AsyncTransportConfiguration<I, FDQ, FDS>,
     ) -> Self {
+        let max_buf_size = configuration.get_max_buf_size();
+
         Self {
             stream,
             req,
             configuration,
             state: CallState::Pending,
+            buf_storage: Vec::with_capacity(max_buf_size),
         }
     }
 }
 
-impl<S> Future for Call<S>
+impl<S, I, FDQ, FDS> Future for Call<S, I, FDQ, FDS>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    I: Clone + Unpin,
+    FDQ: Fn(&[u8]) -> io::Result<(I, Option<Vec<u8>>)> + Clone + Unpin,
+    FDS: Fn(I, &[u8]) -> io::Result<Option<usize>> + Clone + Unpin,
 {
-    type Output = Result<FramingDecoded<AsyncTransport<S>>, anyhow::Error>;
+    type Output = Result<FramingDecoded<AsyncTransport<S, I, FDQ, FDS>>, anyhow::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let this = self.get_mut();
@@ -118,6 +140,7 @@ where
         };
         let req = &this.req;
         let configuration = &this.configuration;
+        let buf_storage = &mut this.buf_storage;
 
         if this.state < CallState::Writed {
             let req_bytes = req.bytes();
@@ -126,43 +149,225 @@ where
             this.state = CallState::Writed;
         }
 
-        // TODO, loop
-        let mut res_buf = vec![0u8; configuration.get_buf_size()];
-        let mut read_future =
-            stream.read_with_timeout(&mut res_buf, configuration.get_read_timeout());
-        ready!(Pin::new(&mut read_future).poll(cx))?;
+        let (identity, res_buf) = (configuration.de_req_bytes)(req.bytes())?;
+        if let Some(res_buf) = res_buf {
+            debug_assert!(buf_storage.is_empty(), "buf_storage should empty");
+            return Poll::Ready(Ok(Cursor::new(Bytes::from(res_buf))));
+        }
 
-        Poll::Ready(Ok(Cursor::new(Bytes::from(res_buf))))
+        let mut buf = vec![0u8; configuration.get_buf_size()];
+        let n_de;
+        loop {
+            let mut read_future =
+                stream.read_with_timeout(&mut buf, configuration.get_read_timeout());
+            let n = ready!(Pin::new(&mut read_future).poll(cx))?;
+            buf_storage.extend_from_slice(&buf[..n]);
+
+            if let Some(n) = (configuration.de_res_bytes)(identity.clone(), &buf_storage)? {
+                n_de = n;
+                break;
+            } else {
+                if buf_storage.len() >= configuration.get_max_buf_size() {
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        "Reach max buffer size",
+                    )
+                    .into()));
+                }
+            }
+        }
+        return Poll::Ready(Ok(Cursor::new(Bytes::from(buf_storage[..n_de].to_vec()))));
     }
 }
 
-//
-//
-//
-#[derive(Default, Clone)]
-pub struct AsyncTransportConfiguration {
-    buf_size: Option<usize>,
-    read_timeout: Option<Duration>,
-}
+#[cfg(all(feature = "futures_io", not(feature = "tokio_io")))]
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl AsyncTransportConfiguration {
-    pub fn new() -> Self {
-        Default::default()
+    use std::panic;
+
+    use futures_lite::future::block_on;
+    use futures_lite::io::Cursor;
+
+    #[test]
+    fn call_with_static_res() -> io::Result<()> {
+        block_on(async {
+            let mut buf = b"1234567890".to_vec();
+            let cursor = Cursor::new(&mut buf);
+            let stream = Arc::new(Mutex::new(cursor));
+            let c = AsyncTransportConfiguration::new(
+                |bytes| {
+                    Ok((
+                        "",
+                        if bytes == b"static" {
+                            Some(b"bar".to_vec())
+                        } else {
+                            None
+                        },
+                    ))
+                },
+                |_, _| unimplemented!(),
+            );
+
+            //
+            let req = Bytes::from("static");
+            let call = Call::new(stream.clone(), req, c.clone());
+
+            let out = call.await.expect("");
+            assert_eq!(out.into_inner(), Bytes::from("bar"));
+
+            assert_eq!(stream.lock().expect("").get_ref(), &b"static7890");
+
+            Ok(())
+        })
     }
 
-    pub fn set_buf_size(&mut self, size: usize) {
-        self.buf_size = Some(size);
+    #[test]
+    fn call_with_dynamic_res() -> io::Result<()> {
+        block_on(async {
+            let mut buf = b"123456789012".to_vec();
+            let cursor = Cursor::new(&mut buf);
+            let stream = Arc::new(Mutex::new(cursor));
+            let c = AsyncTransportConfiguration::new(
+                |bytes| {
+                    Ok((
+                        "id1",
+                        if bytes == b"dynamic" {
+                            None
+                        } else {
+                            unimplemented!()
+                        },
+                    ))
+                },
+                |i, bytes| {
+                    if i == "id1" && bytes == b"89012" {
+                        Ok(Some(2))
+                    } else {
+                        unimplemented!()
+                    }
+                },
+            );
+
+            //
+            let req = Bytes::from("dynamic");
+            let call = Call::new(stream.clone(), req, c.clone());
+
+            let out = call.await.expect("");
+            assert_eq!(out.into_inner(), Bytes::from("89"));
+
+            assert_eq!(stream.lock().expect("").get_ref(), &b"dynamic89012");
+
+            Ok(())
+        })
     }
 
-    fn get_buf_size(&self) -> usize {
-        self.buf_size.unwrap_or(1024)
+    #[test]
+    fn call_with_dynamic_res_and_less_buf_size() -> io::Result<()> {
+        block_on(async {
+            let mut buf = b"123456789012".to_vec();
+            let cursor = Cursor::new(&mut buf);
+            let stream = Arc::new(Mutex::new(cursor));
+            let mut c = AsyncTransportConfiguration::new(
+                |bytes| {
+                    Ok((
+                        "id1",
+                        if bytes == b"dynamic" {
+                            None
+                        } else {
+                            unimplemented!()
+                        },
+                    ))
+                },
+                |i, bytes| {
+                    if i == "id1" {
+                        if bytes == b"8" {
+                            Ok(None)
+                        } else if bytes == b"89" {
+                            Ok(None)
+                        } else if bytes == b"890" {
+                            Ok(None)
+                        } else if bytes == b"8901" {
+                            Ok(None)
+                        } else if bytes == b"89012" {
+                            Ok(Some(4))
+                        } else {
+                            unimplemented!()
+                        }
+                    } else {
+                        unimplemented!()
+                    }
+                },
+            );
+            c.set_buf_size(1);
+
+            //
+            let req = Bytes::from("dynamic");
+            let call = Call::new(stream.clone(), req, c.clone());
+
+            let out = call.await.expect("");
+            assert_eq!(out.into_inner(), Bytes::from("8901"));
+
+            assert_eq!(stream.lock().expect("").get_ref(), &b"dynamic89012");
+
+            Ok(())
+        })
     }
 
-    pub fn set_read_timeout(&mut self, timeout_ms: u32) {
-        self.read_timeout = Some(Duration::from_millis(timeout_ms as u64));
-    }
+    #[test]
+    fn call_with_dynamic_res_and_less_max_buf_size() -> io::Result<()> {
+        block_on(async {
+            let mut buf = b"123456789012".to_vec();
+            let cursor = Cursor::new(&mut buf);
+            let stream = Arc::new(Mutex::new(cursor));
+            let mut c = AsyncTransportConfiguration::new(
+                |bytes| {
+                    Ok((
+                        "id1",
+                        if bytes == b"dynamic" {
+                            None
+                        } else {
+                            unimplemented!()
+                        },
+                    ))
+                },
+                |i, bytes| {
+                    if i == "id1" {
+                        if bytes == b"8" {
+                            Ok(None)
+                        } else if bytes == b"89" {
+                            Ok(None)
+                        } else if bytes == b"890" {
+                            Ok(None)
+                        } else if bytes == b"8901" {
+                            Ok(None)
+                        } else if bytes == b"89012" {
+                            Ok(Some(4))
+                        } else {
+                            unimplemented!()
+                        }
+                    } else {
+                        unimplemented!()
+                    }
+                },
+            );
+            c.set_buf_size(1);
+            c.set_max_buf_size(3);
 
-    fn get_read_timeout(&self) -> Duration {
-        self.read_timeout.unwrap_or(Duration::from_secs(5))
+            //
+            let req = Bytes::from("dynamic");
+            let call = Call::new(stream.clone(), req, c.clone());
+
+            match call.await {
+                Ok(_) => assert!(false),
+                Err(err) => {
+                    assert!(err.to_string() == "Reach max buffer size");
+                }
+            }
+
+            assert_eq!(stream.lock().expect("").get_ref(), &b"dynamic89012");
+
+            Ok(())
+        })
     }
 }

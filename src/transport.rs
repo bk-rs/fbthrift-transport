@@ -12,8 +12,8 @@ use futures_core::ready;
 use futures_x_io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use futures_x_io_timeoutable::AsyncReadWithTimeoutExt;
 
-use crate::configuration::AsyncTransportConfiguration;
-use fbthrift_transport_response_handler::ResponseHandler;
+use crate::configuration::{AsyncTransportConfiguration, DefaultAsyncTransportConfiguration};
+use fbthrift_transport_response_handler::{ResponseHandler, DefaultResponseHandler};
 
 pub struct AsyncTransport<S, H>
 where
@@ -33,6 +33,18 @@ where
         Self {
             stream: Arc::new(Mutex::new(stream)),
             configuration,
+        }
+    }
+}
+
+impl<S> AsyncTransport<S, DefaultResponseHandler>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    pub fn with_default_configuration(stream: S) -> Self {
+        Self {
+            stream: Arc::new(Mutex::new(stream)),
+            configuration: DefaultAsyncTransportConfiguration::default(),
         }
     }
 }

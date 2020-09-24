@@ -100,6 +100,7 @@ where
     //
     state: CallState,
     buf_storage: Vec<u8>,
+    parsed_response_bytes_count: u8,
 }
 
 impl<S, H> Call<S, H>
@@ -120,6 +121,7 @@ where
             configuration,
             state: CallState::Pending,
             buf_storage: Vec::with_capacity(max_buf_size),
+            parsed_response_bytes_count: 0,
         }
     }
 }
@@ -144,6 +146,7 @@ where
         let req = &this.req;
         let configuration = &this.configuration;
         let buf_storage = &mut this.buf_storage;
+        let parsed_response_bytes_count = &mut this.parsed_response_bytes_count;
 
         if this.state < CallState::Writed {
             let req_bytes = req.bytes();
@@ -166,6 +169,18 @@ where
             let mut read_future =
                 stream.read_with_timeout(&mut buf, configuration.get_read_timeout());
             let n = ready!(Pin::new(&mut read_future).poll(cx))?;
+            if n == 0 {
+                *parsed_response_bytes_count += 1;
+                if *parsed_response_bytes_count > configuration.get_max_parse_response_bytes_count() {
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        "Reach max parse response bytes count",
+                    )
+                    .into()));
+                }
+                continue;
+            }
+
             buf_storage.extend_from_slice(&buf[..n]);
 
             if let Some(n) = configuration
@@ -179,6 +194,15 @@ where
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::Other,
                         "Reach max buffer size",
+                    )
+                    .into()));
+                }
+
+                *parsed_response_bytes_count += 1;
+                if *parsed_response_bytes_count > configuration.get_max_parse_response_bytes_count() {
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        "Reach max parse response bytes count",
                     )
                     .into()));
                 }
@@ -349,6 +373,7 @@ mod tests {
             let stream = Arc::new(Mutex::new(cursor));
             let mut c = AsyncTransportConfiguration::new(FooResponseHandler);
             c.set_buf_size(1);
+            c.set_max_parse_response_bytes_count(99);
 
             //
             let req = Bytes::from("dynamic");
@@ -428,6 +453,66 @@ mod tests {
             }
 
             assert_eq!(stream.lock().expect("").get_ref(), &b"dynamic89012");
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn call_with_dynamic_res_and_too_many_read() -> io::Result<()> {
+        #[derive(Clone)]
+        pub struct FooResponseHandler;
+
+        impl ResponseHandler for FooResponseHandler {
+            fn try_make_response_bytes(
+                &self,
+                request_bytes: &[u8],
+            ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)> {
+                Ok((
+                    b"id1".to_vec(),
+                    if request_bytes == b"dynamic" {
+                        None
+                    } else {
+                        unimplemented!()
+                    },
+                ))
+            }
+
+            fn parse_response_bytes(
+                &self,
+                name: &[u8],
+                response_bytes: &[u8],
+            ) -> io::Result<Option<usize>> {
+                if name == b"id1" {
+                    if response_bytes == b"" {
+                        Ok(None)
+                    } else {
+                        unimplemented!()
+                    }
+                } else {
+                    unimplemented!()
+                }
+            }
+        }
+
+        block_on(async {
+            let mut buf = b"".to_vec();
+            let cursor = Cursor::new(&mut buf);
+            let stream = Arc::new(Mutex::new(cursor));
+            let c = AsyncTransportConfiguration::new(FooResponseHandler);
+
+            //
+            let req = Bytes::from("dynamic");
+            let call = Call::new(stream.clone(), req, c.clone());
+
+            match call.await {
+                Ok(_) => assert!(false),
+                Err(err) => {
+                    assert!(err.to_string() == "Reach max parse response bytes count");
+                }
+            }
+
+            assert_eq!(stream.lock().expect("").get_ref(), &b"dynamic");
 
             Ok(())
         })

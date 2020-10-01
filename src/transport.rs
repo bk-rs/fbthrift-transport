@@ -13,7 +13,7 @@ use futures_x_io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use futures_x_io_timeoutable::AsyncReadWithTimeoutExt;
 
 use crate::configuration::{AsyncTransportConfiguration, DefaultAsyncTransportConfiguration};
-use fbthrift_transport_response_handler::{ResponseHandler, DefaultResponseHandler};
+use fbthrift_transport_response_handler::{DefaultResponseHandler, ResponseHandler};
 
 pub struct AsyncTransport<S, H>
 where
@@ -144,7 +144,7 @@ where
             }
         };
         let req = &this.req;
-        let configuration = &this.configuration;
+        let configuration = &mut this.configuration;
         let buf_storage = &mut this.buf_storage;
         let parsed_response_bytes_count = &mut this.parsed_response_bytes_count;
 
@@ -155,12 +155,12 @@ where
             this.state = CallState::Writed;
         }
 
-        let (name, res_buf) = configuration
+        let static_res_buf = configuration
             .response_handler
-            .try_make_response_bytes(req.bytes())?;
-        if let Some(res_buf) = res_buf {
-            debug_assert!(buf_storage.is_empty(), "buf_storage should empty");
-            return Poll::Ready(Ok(Cursor::new(Bytes::from(res_buf))));
+            .try_make_static_response_bytes(req.bytes())?;
+        if let Some(static_res_buf) = static_res_buf {
+            debug_assert!(buf_storage.is_empty(), "The buf_storage should empty");
+            return Poll::Ready(Ok(Cursor::new(Bytes::from(static_res_buf))));
         }
 
         let mut buf = vec![0u8; configuration.get_buf_size()];
@@ -171,7 +171,8 @@ where
             let n = ready!(Pin::new(&mut read_future).poll(cx))?;
             if n == 0 {
                 *parsed_response_bytes_count += 1;
-                if *parsed_response_bytes_count > configuration.get_max_parse_response_bytes_count() {
+                if *parsed_response_bytes_count > configuration.get_max_parse_response_bytes_count()
+                {
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::Other,
                         "Reach max parse response bytes count",
@@ -185,7 +186,7 @@ where
 
             if let Some(n) = configuration
                 .response_handler
-                .parse_response_bytes(&name, &buf_storage)?
+                .parse_response_bytes(&buf_storage)?
             {
                 n_de = n;
                 break;
@@ -199,7 +200,8 @@ where
                 }
 
                 *parsed_response_bytes_count += 1;
-                if *parsed_response_bytes_count > configuration.get_max_parse_response_bytes_count() {
+                if *parsed_response_bytes_count > configuration.get_max_parse_response_bytes_count()
+                {
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::Other,
                         "Reach max parse response bytes count",
@@ -228,23 +230,19 @@ mod tests {
         pub struct FooResponseHandler;
 
         impl ResponseHandler for FooResponseHandler {
-            fn try_make_response_bytes(
-                &self,
+            fn try_make_static_response_bytes(
+                &mut self,
                 request_bytes: &[u8],
-            ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)> {
-                Ok((
-                    b"".to_vec(),
-                    if request_bytes == b"static" {
-                        Some(b"bar".to_vec())
-                    } else {
-                        None
-                    },
-                ))
+            ) -> io::Result<Option<Vec<u8>>> {
+                Ok(if request_bytes == b"static" {
+                    Some(b"bar".to_vec())
+                } else {
+                    None
+                })
             }
 
             fn parse_response_bytes(
-                &self,
-                _name: &[u8],
+                &mut self,
                 _response_bytes: &[u8],
             ) -> io::Result<Option<usize>> {
                 unimplemented!()
@@ -276,26 +274,19 @@ mod tests {
         pub struct FooResponseHandler;
 
         impl ResponseHandler for FooResponseHandler {
-            fn try_make_response_bytes(
-                &self,
+            fn try_make_static_response_bytes(
+                &mut self,
                 request_bytes: &[u8],
-            ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)> {
-                Ok((
-                    b"id1".to_vec(),
-                    if request_bytes == b"dynamic" {
-                        None
-                    } else {
-                        unimplemented!()
-                    },
-                ))
+            ) -> io::Result<Option<Vec<u8>>> {
+                Ok(if request_bytes == b"dynamic" {
+                    None
+                } else {
+                    unimplemented!()
+                })
             }
 
-            fn parse_response_bytes(
-                &self,
-                name: &[u8],
-                response_bytes: &[u8],
-            ) -> io::Result<Option<usize>> {
-                if name == b"id1" && response_bytes == b"89012" {
+            fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>> {
+                if response_bytes == b"89012" {
                     Ok(Some(2))
                 } else {
                     unimplemented!()
@@ -328,39 +319,28 @@ mod tests {
         pub struct FooResponseHandler;
 
         impl ResponseHandler for FooResponseHandler {
-            fn try_make_response_bytes(
-                &self,
+            fn try_make_static_response_bytes(
+                &mut self,
                 request_bytes: &[u8],
-            ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)> {
-                Ok((
-                    b"id1".to_vec(),
-                    if request_bytes == b"dynamic" {
-                        None
-                    } else {
-                        unimplemented!()
-                    },
-                ))
+            ) -> io::Result<Option<Vec<u8>>> {
+                Ok(if request_bytes == b"dynamic" {
+                    None
+                } else {
+                    unimplemented!()
+                })
             }
 
-            fn parse_response_bytes(
-                &self,
-                name: &[u8],
-                response_bytes: &[u8],
-            ) -> io::Result<Option<usize>> {
-                if name == b"id1" {
-                    if response_bytes == b"8" {
-                        Ok(None)
-                    } else if response_bytes == b"89" {
-                        Ok(None)
-                    } else if response_bytes == b"890" {
-                        Ok(None)
-                    } else if response_bytes == b"8901" {
-                        Ok(None)
-                    } else if response_bytes == b"89012" {
-                        Ok(Some(4))
-                    } else {
-                        unimplemented!()
-                    }
+            fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>> {
+                if response_bytes == b"8" {
+                    Ok(None)
+                } else if response_bytes == b"89" {
+                    Ok(None)
+                } else if response_bytes == b"890" {
+                    Ok(None)
+                } else if response_bytes == b"8901" {
+                    Ok(None)
+                } else if response_bytes == b"89012" {
+                    Ok(Some(4))
                 } else {
                     unimplemented!()
                 }
@@ -394,39 +374,28 @@ mod tests {
         pub struct FooResponseHandler;
 
         impl ResponseHandler for FooResponseHandler {
-            fn try_make_response_bytes(
-                &self,
+            fn try_make_static_response_bytes(
+                &mut self,
                 request_bytes: &[u8],
-            ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)> {
-                Ok((
-                    b"id1".to_vec(),
-                    if request_bytes == b"dynamic" {
-                        None
-                    } else {
-                        unimplemented!()
-                    },
-                ))
+            ) -> io::Result<Option<Vec<u8>>> {
+                Ok(if request_bytes == b"dynamic" {
+                    None
+                } else {
+                    unimplemented!()
+                })
             }
 
-            fn parse_response_bytes(
-                &self,
-                name: &[u8],
-                response_bytes: &[u8],
-            ) -> io::Result<Option<usize>> {
-                if name == b"id1" {
-                    if response_bytes == b"8" {
-                        Ok(None)
-                    } else if response_bytes == b"89" {
-                        Ok(None)
-                    } else if response_bytes == b"890" {
-                        Ok(None)
-                    } else if response_bytes == b"8901" {
-                        Ok(None)
-                    } else if response_bytes == b"89012" {
-                        Ok(Some(4))
-                    } else {
-                        unimplemented!()
-                    }
+            fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>> {
+                if response_bytes == b"8" {
+                    Ok(None)
+                } else if response_bytes == b"89" {
+                    Ok(None)
+                } else if response_bytes == b"890" {
+                    Ok(None)
+                } else if response_bytes == b"8901" {
+                    Ok(None)
+                } else if response_bytes == b"89012" {
+                    Ok(Some(4))
                 } else {
                     unimplemented!()
                 }
@@ -464,31 +433,20 @@ mod tests {
         pub struct FooResponseHandler;
 
         impl ResponseHandler for FooResponseHandler {
-            fn try_make_response_bytes(
-                &self,
+            fn try_make_static_response_bytes(
+                &mut self,
                 request_bytes: &[u8],
-            ) -> io::Result<(Vec<u8>, Option<Vec<u8>>)> {
-                Ok((
-                    b"id1".to_vec(),
-                    if request_bytes == b"dynamic" {
-                        None
-                    } else {
-                        unimplemented!()
-                    },
-                ))
+            ) -> io::Result<Option<Vec<u8>>> {
+                Ok(if request_bytes == b"dynamic" {
+                    None
+                } else {
+                    unimplemented!()
+                })
             }
 
-            fn parse_response_bytes(
-                &self,
-                name: &[u8],
-                response_bytes: &[u8],
-            ) -> io::Result<Option<usize>> {
-                if name == b"id1" {
-                    if response_bytes == b"" {
-                        Ok(None)
-                    } else {
-                        unimplemented!()
-                    }
+            fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>> {
+                if response_bytes == b"" {
+                    Ok(None)
                 } else {
                     unimplemented!()
                 }

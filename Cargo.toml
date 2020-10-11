@@ -17,7 +17,7 @@ futures_io = ["futures-x-io/futures_util_io", "futures-x-io-timeoutable/futures_
 tokio_io = ["futures-x-io/tokio_io_util", "futures-x-io-timeoutable/tokio_io"]
 
 [dependencies]
-fbthrift = { version = "0.0.2", default-features = false, features = [], package = "fbthrift-git" }
+fbthrift = { version = "0.0.3", default-features = false, features = [], package = "fbthrift-git" }
 cfg-if = { version = "0.1", default-features = false, features = [] }
 bytes = { version = "0.5", default-features = false, features = [] }
 anyhow = { version = "1.0", default-features = false, features = [] }

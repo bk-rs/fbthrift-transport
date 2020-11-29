@@ -79,10 +79,11 @@ sudo apt install -y libzstd-dev
 ```
 cd ~
 git clone https://github.com/facebook/fbthrift && cd fbthrift
-git checkout eb490b2c9f020c384bdbc1f98cec46ffc306890d
+git checkout c18333c
 mkdir _build && cd _build
 cmake ..
 make -j $(nproc)
 sudo make install
+which thrift1
 cd
 ```

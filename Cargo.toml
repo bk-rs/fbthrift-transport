@@ -13,8 +13,10 @@ categories = []
 readme = "README.md"
 
 [features]
+# default = ["tokio_io"]
 futures_io = ["futures-x-io/futures_util_io", "futures-x-io-timeoutable/futures_io"]
 tokio02_io = ["futures-x-io/tokio02_io_util", "futures-x-io-timeoutable/tokio02_io"]
+tokio_io = ["futures-x-io/tokio_io_util", "futures-x-io-timeoutable/tokio_io"]
 
 [dependencies]
 fbthrift = { version = "=0.0.5", default-features = false, features = [], package = "fbthrift-git" }
@@ -29,6 +31,7 @@ futures-x-io-timeoutable = { version = "0.2.2", default-features = false, featur
 
 [dev-dependencies]
 futures-lite = { version = "1.11"}
+tokio = { version = "1.0", features = ["rt-multi-thread"] }
 
 [workspace]
 members = [
@@ -38,5 +41,8 @@ members = [
 [package.metadata.cargo-all-features]
 skip_feature_sets = [
     ["futures_io", "tokio02_io"],
+    ["futures_io", "tokio_io"],
+
+    ["tokio02_io", "tokio_io"],
 ]
 skip_optional_dependencies = true

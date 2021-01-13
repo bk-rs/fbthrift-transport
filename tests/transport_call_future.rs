@@ -19,8 +19,8 @@ fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
     not(feature = "tokio_io"),
 ))]
 #[cfg(test)]
-#[path = "./inner_tests/transport.rs"]
-mod transport_with_futures_io_tests;
+#[path = "./inner_tests/transport_call_future.rs"]
+mod transport_call_future_with_futures_io_tests;
 
 //
 //
@@ -47,8 +47,8 @@ fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
     not(feature = "tokio_io"),
 ))]
 #[cfg(test)]
-#[path = "./inner_tests/transport.rs"]
-mod transport_with_tokio02_io_tests;
+#[path = "./inner_tests/transport_call_future.rs"]
+mod transport_call_future_with_tokio02_io_tests;
 
 //
 //
@@ -75,5 +75,5 @@ fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
     feature = "tokio_io",
 ))]
 #[cfg(test)]
-#[path = "./inner_tests/transport.rs"]
-mod transport_with_tokio_io_tests;
+#[path = "./inner_tests/transport_call_future.rs"]
+mod transport_call_future_with_tokio_io_tests;

@@ -2,11 +2,11 @@ use super::*;
 
 use std::io;
 use std::panic;
+use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 use fbthrift_transport::{transport::Call, AsyncTransportConfiguration};
 use fbthrift_transport_response_handler::ResponseHandler;
-use std::sync::{Arc, Mutex};
 
 #[test]
 fn call_with_static_res() -> io::Result<()> {

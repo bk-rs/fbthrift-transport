@@ -89,8 +89,7 @@ enum CallState {
     Writed,
 }
 
-#[doc(hidden)]
-pub struct Call<S, H>
+struct Call<S, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     H: ResponseHandler,
@@ -109,8 +108,7 @@ where
     S: AsyncRead + AsyncWrite + Unpin,
     H: ResponseHandler,
 {
-    #[doc(hidden)]
-    pub fn new(
+    fn new(
         stream: Arc<Mutex<S>>,
         req: FramingEncodedFinal<AsyncTransport<S, H>>,
         configuration: AsyncTransportConfiguration<H>,
@@ -218,3 +216,30 @@ where
         Poll::Ready(Ok(Cursor::new(Bytes::from(buf_storage[..n_de].to_vec()))))
     }
 }
+
+#[cfg(all(
+    feature = "futures_io",
+    not(feature = "tokio02_io"),
+    not(feature = "tokio_io"),
+))]
+#[path = "transport_call_future_tests_with_futures_io.rs"]
+#[cfg(test)]
+mod transport_call_future_tests_with_futures_io;
+
+#[cfg(all(
+    not(feature = "futures_io"),
+    feature = "tokio02_io",
+    not(feature = "tokio_io"),
+))]
+#[path = "transport_call_future_tests_with_tokio02_io.rs"]
+#[cfg(test)]
+mod transport_call_future_tests_with_tokio02_io;
+
+#[cfg(all(
+    not(feature = "futures_io"),
+    not(feature = "tokio02_io"),
+    feature = "tokio_io",
+))]
+#[path = "transport_call_future_tests_with_tokio_io.rs"]
+#[cfg(test)]
+mod transport_call_future_tests_with_tokio_io;

@@ -8,12 +8,12 @@ use std::task::{Context, Poll};
 use bytes::Buf;
 use bytes::{Bytes, BytesMut};
 use fbthrift::{Framing, FramingDecoded, FramingEncodedFinal, Transport};
+use fbthrift_transport_response_handler::{DefaultResponseHandler, ResponseHandler};
 use futures_core::ready;
-use futures_x_io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use futures_x_io_timeoutable::AsyncReadWithTimeoutExt;
 
 use crate::configuration::{AsyncTransportConfiguration, DefaultAsyncTransportConfiguration};
-use fbthrift_transport_response_handler::{DefaultResponseHandler, ResponseHandler};
+
+use super::{pin_write_future, AsyncRead, AsyncReadWithTimeoutExt, AsyncWrite, AsyncWriteExt};
 
 pub struct AsyncTransport<S, H>
 where
@@ -153,10 +153,9 @@ where
         if this.state < CallState::Writed {
             let req_bytes = req.bytes();
             let mut write_future = stream.write_all(req_bytes);
-            #[cfg(any(feature = "futures_io", feature = "tokio02_io"))]
-            ready!(Pin::new(&mut write_future).poll(cx))?;
-            #[cfg(feature = "tokio_io")]
-            ready!(unsafe { Pin::new_unchecked(&mut write_future) }.poll(cx))?;
+
+            ready!(pin_write_future(&mut write_future).poll(cx))?;
+
             this.state = CallState::Writed;
         }
 
@@ -215,6 +214,7 @@ where
                 }
             }
         }
-        return Poll::Ready(Ok(Cursor::new(Bytes::from(buf_storage[..n_de].to_vec()))));
+
+        Poll::Ready(Ok(Cursor::new(Bytes::from(buf_storage[..n_de].to_vec()))))
     }
 }

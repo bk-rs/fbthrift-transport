@@ -26,8 +26,8 @@ futures-core = { version = "0.3", default-features = false, features = [] }
 
 fbthrift-transport-response-handler = { path = "response-handler", version = "0.4" }
 
-futures-x-io = { version = "0.2.2", default-features = false, features = [], optional = true }
-futures-x-io-timeoutable = { version = "0.2.2", default-features = false, features = [], optional = true }
+futures-x-io = { version = "0.3", default-features = false, features = [], optional = true }
+futures-x-io-timeoutable = { version = "0.3", default-features = false, features = [], optional = true }
 
 [dev-dependencies]
 futures-lite = { version = "1.11", default-features = false, features = [] }

@@ -6,6 +6,7 @@ mod transport_tokio_io_tests {
     use std::io;
 
     use bytes::Bytes;
+    use const_cstr::const_cstr;
     use fbthrift::Transport;
 
     #[cfg(all(not(feature = "tokio02_io"), feature = "tokio_io"))]
@@ -32,6 +33,8 @@ mod transport_tokio_io_tests {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
+            _service_name: &'static str,
+            _fn_name: &'static str,
             _request_bytes: &[u8],
         ) -> io::Result<Option<Vec<u8>>> {
             Ok(None)
@@ -88,7 +91,11 @@ mod transport_tokio_io_tests {
 
             for n in 0..10_usize {
                 let cursor = transport
-                    .call(Bytes::from("abcde"))
+                    .call(
+                        &const_cstr!("my_service"),
+                        &const_cstr!("my_fn"),
+                        Bytes::from("abcde"),
+                    )
                     .await
                     .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
 

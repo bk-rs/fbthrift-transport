@@ -7,6 +7,7 @@ use std::task::{Context, Poll};
 
 use bytes::Buf;
 use bytes::{Bytes, BytesMut};
+use const_cstr::ConstCStr;
 use fbthrift::{Framing, FramingDecoded, FramingEncodedFinal, Transport};
 use fbthrift_transport_response_handler::{DefaultResponseHandler, ResponseHandler};
 use futures_core::ready;
@@ -72,11 +73,15 @@ where
 {
     fn call(
         &self,
+        service_name: &ConstCStr,
+        fn_name: &ConstCStr,
         req: FramingEncodedFinal<Self>,
     ) -> Pin<Box<dyn Future<Output = Result<FramingDecoded<Self>, anyhow::Error>> + Send + 'static>>
     {
         Pin::from(Box::new(Call::new(
             self.stream.clone(),
+            service_name.to_owned(),
+            fn_name.to_owned(),
             req,
             self.configuration.clone(),
         )))
@@ -95,6 +100,8 @@ where
     H: ResponseHandler,
 {
     stream: Arc<Mutex<S>>,
+    service_name: ConstCStr,
+    fn_name: ConstCStr,
     req: FramingEncodedFinal<AsyncTransport<S, H>>,
     configuration: AsyncTransportConfiguration<H>,
     //
@@ -110,6 +117,8 @@ where
 {
     fn new(
         stream: Arc<Mutex<S>>,
+        service_name: ConstCStr,
+        fn_name: ConstCStr,
         req: FramingEncodedFinal<AsyncTransport<S, H>>,
         configuration: AsyncTransportConfiguration<H>,
     ) -> Self {
@@ -117,6 +126,8 @@ where
 
         Self {
             stream,
+            service_name,
+            fn_name,
             req,
             configuration,
             state: CallState::Pending,
@@ -143,6 +154,8 @@ where
                 ))
             }
         };
+        let service_name = &this.service_name;
+        let fn_name = &this.fn_name;
         let req = &this.req;
         let configuration = &mut this.configuration;
         let buf_storage = &mut this.buf_storage;
@@ -159,7 +172,7 @@ where
 
         let static_res_buf = configuration
             .response_handler
-            .try_make_static_response_bytes(req.bytes())?;
+            .try_make_static_response_bytes(service_name.to_str(), fn_name.to_str(), req.bytes())?;
         if let Some(static_res_buf) = static_res_buf {
             debug_assert!(buf_storage.is_empty(), "The buf_storage should empty");
             return Poll::Ready(Ok(Cursor::new(Bytes::from(static_res_buf))));

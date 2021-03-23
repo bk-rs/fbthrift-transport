@@ -3,6 +3,8 @@ use std::io;
 pub trait ResponseHandler: Clone {
     fn try_make_static_response_bytes(
         &mut self,
+        service_name: &'static str,
+        fn_name: &'static str,
         request_bytes: &[u8],
     ) -> io::Result<Option<Vec<u8>>>;
 
@@ -15,6 +17,8 @@ pub struct DefaultResponseHandler;
 impl ResponseHandler for DefaultResponseHandler {
     fn try_make_static_response_bytes(
         &mut self,
+        _service_name: &'static str,
+        _fn_name: &'static str,
         _request_bytes: &[u8],
     ) -> io::Result<Option<Vec<u8>>> {
         Ok(None)
@@ -35,7 +39,10 @@ mod tests {
     fn with_default_response_handler() -> io::Result<()> {
         let mut h = DefaultResponseHandler;
 
-        assert_eq!(h.try_make_static_response_bytes(&b""[..])?, None);
+        assert_eq!(
+            h.try_make_static_response_bytes("my_service", "my_fn", &b""[..])?,
+            None
+        );
 
         assert_eq!(h.parse_response_bytes(&b"foo"[..])?, Some(3));
 

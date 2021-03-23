@@ -1,10 +1,10 @@
 use super::*;
 
 use std::io;
-use std::panic;
 use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
+use const_cstr::const_cstr;
 use fbthrift_transport_response_handler::ResponseHandler;
 
 #[test]
@@ -15,6 +15,8 @@ fn call_with_static_res() -> io::Result<()> {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
+            _service_name: &'static str,
+            _fn_name: &'static str,
             request_bytes: &[u8],
         ) -> io::Result<Option<Vec<u8>>> {
             Ok(if request_bytes == b"static" {
@@ -37,7 +39,13 @@ fn call_with_static_res() -> io::Result<()> {
 
         //
         let req = Bytes::from("static");
-        let call = Call::new(stream.clone(), req, c.clone());
+        let call = Call::new(
+            stream.clone(),
+            const_cstr!("my_service"),
+            const_cstr!("my_fn"),
+            req,
+            c.clone(),
+        );
 
         let out = call.await.expect("");
         assert_eq!(out.into_inner(), Bytes::from("bar"));
@@ -56,6 +64,8 @@ fn call_with_dynamic_res() -> io::Result<()> {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
+            _service_name: &'static str,
+            _fn_name: &'static str,
             request_bytes: &[u8],
         ) -> io::Result<Option<Vec<u8>>> {
             Ok(if request_bytes == b"dynamic" {
@@ -82,7 +92,13 @@ fn call_with_dynamic_res() -> io::Result<()> {
 
         //
         let req = Bytes::from("dynamic");
-        let call = Call::new(stream.clone(), req, c.clone());
+        let call = Call::new(
+            stream.clone(),
+            const_cstr!("my_service"),
+            const_cstr!("my_fn"),
+            req,
+            c.clone(),
+        );
 
         let out = call.await.expect("");
         assert_eq!(out.into_inner(), Bytes::from("89"));
@@ -101,6 +117,8 @@ fn call_with_dynamic_res_and_less_buf_size() -> io::Result<()> {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
+            _service_name: &'static str,
+            _fn_name: &'static str,
             request_bytes: &[u8],
         ) -> io::Result<Option<Vec<u8>>> {
             Ok(if request_bytes == b"dynamic" {
@@ -137,7 +155,13 @@ fn call_with_dynamic_res_and_less_buf_size() -> io::Result<()> {
 
         //
         let req = Bytes::from("dynamic");
-        let call = Call::new(stream.clone(), req, c.clone());
+        let call = Call::new(
+            stream.clone(),
+            const_cstr!("my_service"),
+            const_cstr!("my_fn"),
+            req,
+            c.clone(),
+        );
 
         let out = call.await.expect("");
         assert_eq!(out.into_inner(), Bytes::from("8901"));
@@ -156,6 +180,8 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> io::Result<()> {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
+            _service_name: &'static str,
+            _fn_name: &'static str,
             request_bytes: &[u8],
         ) -> io::Result<Option<Vec<u8>>> {
             Ok(if request_bytes == b"dynamic" {
@@ -192,7 +218,13 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> io::Result<()> {
 
         //
         let req = Bytes::from("dynamic");
-        let call = Call::new(stream.clone(), req, c.clone());
+        let call = Call::new(
+            stream.clone(),
+            const_cstr!("my_service"),
+            const_cstr!("my_fn"),
+            req,
+            c.clone(),
+        );
 
         match call.await {
             Ok(_) => assert!(false),
@@ -215,6 +247,8 @@ fn call_with_dynamic_res_and_too_many_read() -> io::Result<()> {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
+            _service_name: &'static str,
+            _fn_name: &'static str,
             request_bytes: &[u8],
         ) -> io::Result<Option<Vec<u8>>> {
             Ok(if request_bytes == b"dynamic" {
@@ -241,7 +275,13 @@ fn call_with_dynamic_res_and_too_many_read() -> io::Result<()> {
 
         //
         let req = Bytes::from("dynamic");
-        let call = Call::new(stream.clone(), req, c.clone());
+        let call = Call::new(
+            stream.clone(),
+            const_cstr!("my_service"),
+            const_cstr!("my_fn"),
+            req,
+            c.clone(),
+        );
 
         match call.await {
             Ok(_) => assert!(false),

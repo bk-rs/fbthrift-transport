@@ -1,14 +1,16 @@
 use super::*;
 
-use std::io;
-use std::sync::{Arc, Mutex};
+use std::{
+    error, io,
+    sync::{Arc, Mutex},
+};
 
 use bytes::Bytes;
 use const_cstr::const_cstr;
 use fbthrift_transport_response_handler::ResponseHandler;
 
 #[test]
-fn call_with_static_res() -> io::Result<()> {
+fn call_with_static_res() -> Result<(), Box<dyn error::Error>> {
     #[derive(Clone)]
     pub struct FooResponseHandler;
 
@@ -57,7 +59,7 @@ fn call_with_static_res() -> io::Result<()> {
 }
 
 #[test]
-fn call_with_dynamic_res() -> io::Result<()> {
+fn call_with_dynamic_res() -> Result<(), Box<dyn error::Error>> {
     #[derive(Clone)]
     pub struct FooResponseHandler;
 
@@ -110,7 +112,7 @@ fn call_with_dynamic_res() -> io::Result<()> {
 }
 
 #[test]
-fn call_with_dynamic_res_and_less_buf_size() -> io::Result<()> {
+fn call_with_dynamic_res_and_less_buf_size() -> Result<(), Box<dyn error::Error>> {
     #[derive(Clone)]
     pub struct FooResponseHandler;
 
@@ -173,7 +175,7 @@ fn call_with_dynamic_res_and_less_buf_size() -> io::Result<()> {
 }
 
 #[test]
-fn call_with_dynamic_res_and_less_max_buf_size() -> io::Result<()> {
+fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn error::Error>> {
     #[derive(Clone)]
     pub struct FooResponseHandler;
 
@@ -240,7 +242,7 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> io::Result<()> {
 }
 
 #[test]
-fn call_with_dynamic_res_and_too_many_read() -> io::Result<()> {
+fn call_with_dynamic_res_and_too_many_read() -> Result<(), Box<dyn error::Error>> {
     #[derive(Clone)]
     pub struct FooResponseHandler;
 

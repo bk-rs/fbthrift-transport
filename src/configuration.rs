@@ -77,10 +77,8 @@ impl Default for DefaultAsyncTransportConfiguration {
 mod tests {
     use super::*;
 
-    use std::io;
-
     #[test]
-    fn get_and_set() -> io::Result<()> {
+    fn get_and_set() {
         let mut c: DefaultAsyncTransportConfiguration = Default::default();
 
         assert_eq!(c.get_buf_size(), 1024);
@@ -96,7 +94,5 @@ mod tests {
         assert_eq!(c.get_read_timeout(), Duration::from_secs(3));
         c.set_max_parse_response_bytes_count(2);
         assert_eq!(c.get_max_parse_response_bytes_count(), 2);
-
-        Ok(())
     }
 }

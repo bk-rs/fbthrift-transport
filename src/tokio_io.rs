@@ -5,8 +5,7 @@ use futures_x_io::{
 use futures_x_io_timeoutable::tokio_io::rw::AsyncReadWithTimeoutExt;
 
 //
-use std::ops::Deref;
-use std::pin::Pin;
+use std::{ops::Deref, pin::Pin};
 
 fn pin_write_future<P>(write_future: P) -> Pin<P>
 where

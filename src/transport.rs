@@ -1,12 +1,13 @@
-use std::future::Future;
-use std::io;
-use std::io::Cursor;
-use std::pin::Pin;
-use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll};
+use std::{
+    future::Future,
+    io,
+    io::Cursor,
+    pin::Pin,
+    sync::{Arc, Mutex},
+    task::{Context, Poll},
+};
 
-use bytes::Buf;
-use bytes::{Bytes, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use const_cstr::ConstCStr;
 use fbthrift::{Framing, FramingDecoded, FramingEncodedFinal, Transport};
 use fbthrift_transport_response_handler::{DefaultResponseHandler, ResponseHandler};

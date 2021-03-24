@@ -4,18 +4,22 @@
     not(feature = "tokio_io")
 ))]
 mod transport_futures_io_tests {
-    use std::io;
-    use std::net::{TcpListener, TcpStream};
-    use std::sync::Arc;
-    use std::thread;
+    use std::{
+        error, io,
+        net::{TcpListener, TcpStream},
+        sync::Arc,
+        thread,
+    };
 
     use async_executor::{Executor, Task};
     use async_io::Async;
     use bytes::Bytes;
     use const_cstr::const_cstr;
     use fbthrift::Transport;
-    use futures_lite::future::{self, block_on};
-    use futures_lite::io::{AsyncReadExt, AsyncWriteExt};
+    use futures_lite::{
+        future::{self, block_on},
+        io::{AsyncReadExt, AsyncWriteExt},
+    };
 
     use fbthrift_transport::AsyncTransport;
     use fbthrift_transport_response_handler::ResponseHandler;
@@ -43,7 +47,7 @@ mod transport_futures_io_tests {
     }
 
     #[test]
-    fn simple() -> io::Result<()> {
+    fn simple() -> Result<(), Box<dyn error::Error>> {
         let ex = Executor::new();
         let ex = Arc::new(ex);
 

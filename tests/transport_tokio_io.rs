@@ -3,7 +3,7 @@
     any(feature = "tokio02_io", feature = "tokio_io"),
 ))]
 mod transport_tokio_io_tests {
-    use std::io;
+    use std::{error, io};
 
     use bytes::Bytes;
     use const_cstr::const_cstr;
@@ -50,7 +50,7 @@ mod transport_tokio_io_tests {
     }
 
     #[test]
-    fn simple() -> io::Result<()> {
+    fn simple() -> Result<(), Box<dyn error::Error>> {
         #[cfg(all(not(feature = "tokio02_io"), feature = "tokio_io"))]
         let rt = Runtime::new().unwrap();
         #[cfg(all(feature = "tokio02_io", not(feature = "tokio_io")))]

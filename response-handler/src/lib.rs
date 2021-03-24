@@ -33,10 +33,10 @@ impl ResponseHandler for DefaultResponseHandler {
 mod tests {
     use super::*;
 
-    use std::io;
+    use std::error;
 
     #[test]
-    fn with_default_response_handler() -> io::Result<()> {
+    fn with_default_response_handler() -> Result<(), Box<dyn error::Error>> {
         let mut h = DefaultResponseHandler;
 
         assert_eq!(

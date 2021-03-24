@@ -1,6 +1,6 @@
 [package]
 name = "fbthrift-transport"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["vkill <vkill.net@gmail.com>"]
 edition = "2018"
 description = "fbthrift transport."
@@ -28,7 +28,7 @@ anyhow = { version = "1.0", default-features = false, features = [] }
 futures-core = { version = "0.3", default-features = false, features = [] }
 const-cstr = { version = "0.3", default-features = false, features = [] }
 
-fbthrift-transport-response-handler = { path = "response-handler", version = "0.4" }
+fbthrift-transport-response-handler = { path = "response-handler", version = "0.5" }
 
 futures-x-io = { version = "0.3", default-features = false, features = [], optional = true }
 futures-x-io-timeoutable = { version = "0.3", default-features = false, features = [], optional = true }

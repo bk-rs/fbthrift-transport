@@ -12,6 +12,9 @@ keywords = []
 categories = []
 readme = "README.md"
 
+[package.metadata.docs.rs]
+features = [ "futures_io", "tokio02_io", "tokio_io" ]
+
 [features]
 # default = ["tokio_io"]
 futures_io = ["futures-x-io/futures_util_io", "futures-x-io-timeoutable/futures_io"]

@@ -1,5 +1,6 @@
 use core::{
     future::Future,
+    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -8,53 +9,63 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use async_sleep::{timeout, Sleepble};
 use bytes::{Buf, Bytes, BytesMut};
 use const_cstr::ConstCStr;
 use fbthrift::{Framing, FramingDecoded, FramingEncodedFinal, Transport};
 use fbthrift_transport_response_handler::{DefaultResponseHandler, ResponseHandler};
-use futures_core::ready;
+use futures_util::{
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    ready,
+};
 
 use crate::configuration::{AsyncTransportConfiguration, DefaultAsyncTransportConfiguration};
 
-use super::{pin_write_future, AsyncRead, AsyncReadWithTimeoutExt, AsyncWrite, AsyncWriteExt};
-
-pub struct AsyncTransport<S, H>
+//
+pub struct AsyncTransport<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    SLEEP: Sleepble,
     H: ResponseHandler,
 {
     stream: Arc<Mutex<S>>,
     configuration: AsyncTransportConfiguration<H>,
+    phantom: PhantomData<SLEEP>,
 }
 
-impl<S, H> AsyncTransport<S, H>
+impl<S, SLEEP, H> AsyncTransport<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    SLEEP: Sleepble,
     H: ResponseHandler + Unpin,
 {
     pub fn new(stream: S, configuration: AsyncTransportConfiguration<H>) -> Self {
         Self {
             stream: Arc::new(Mutex::new(stream)),
             configuration,
+            phantom: PhantomData,
         }
     }
 }
 
-impl<S> AsyncTransport<S, DefaultResponseHandler>
+impl<S, SLEEP> AsyncTransport<S, SLEEP, DefaultResponseHandler>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    SLEEP: Sleepble,
 {
     pub fn with_default_configuration(stream: S) -> Self {
         Self {
             stream: Arc::new(Mutex::new(stream)),
             configuration: DefaultAsyncTransportConfiguration::default(),
+            phantom: PhantomData,
         }
     }
 }
 
-impl<S, H> Framing for AsyncTransport<S, H>
+impl<S, SLEEP, H> Framing for AsyncTransport<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    SLEEP: Sleepble,
     H: ResponseHandler,
 {
     type EncBuf = BytesMut;
@@ -68,9 +79,10 @@ where
     fn get_meta(&self) {}
 }
 
-impl<S, H> Transport for AsyncTransport<S, H>
+impl<S, SLEEP, H> Transport for AsyncTransport<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+    SLEEP: Sleepble + Send + 'static,
     H: ResponseHandler + Unpin + Send + 'static,
 {
     fn call(
@@ -80,7 +92,7 @@ where
         req: FramingEncodedFinal<Self>,
     ) -> Pin<Box<dyn Future<Output = Result<FramingDecoded<Self>, anyhow::Error>> + Send + 'static>>
     {
-        Pin::from(Box::new(Call::new(
+        Pin::from(Box::new(Call::<S, SLEEP, H>::new(
             self.stream.clone(),
             service_name.to_owned(),
             fn_name.to_owned(),
@@ -96,15 +108,16 @@ enum CallState {
     Writed,
 }
 
-struct Call<S, H>
+struct Call<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    SLEEP: Sleepble,
     H: ResponseHandler,
 {
     stream: Arc<Mutex<S>>,
     service_name: ConstCStr,
     fn_name: ConstCStr,
-    req: FramingEncodedFinal<AsyncTransport<S, H>>,
+    req: FramingEncodedFinal<AsyncTransport<S, SLEEP, H>>,
     configuration: AsyncTransportConfiguration<H>,
     //
     state: CallState,
@@ -112,16 +125,17 @@ where
     parsed_response_bytes_count: u8,
 }
 
-impl<S, H> Call<S, H>
+impl<S, SLEEP, H> Call<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    SLEEP: Sleepble,
     H: ResponseHandler,
 {
     fn new(
         stream: Arc<Mutex<S>>,
         service_name: ConstCStr,
         fn_name: ConstCStr,
-        req: FramingEncodedFinal<AsyncTransport<S, H>>,
+        req: FramingEncodedFinal<AsyncTransport<S, SLEEP, H>>,
         configuration: AsyncTransportConfiguration<H>,
     ) -> Self {
         let max_buf_size = configuration.get_max_buf_size();
@@ -139,12 +153,13 @@ where
     }
 }
 
-impl<S, H> Future for Call<S, H>
+impl<S, SLEEP, H> Future for Call<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
+    SLEEP: Sleepble,
     H: ResponseHandler + Unpin,
 {
-    type Output = Result<FramingDecoded<AsyncTransport<S, H>>, anyhow::Error>;
+    type Output = Result<FramingDecoded<AsyncTransport<S, SLEEP, H>>, anyhow::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let this = self.get_mut();
@@ -164,8 +179,7 @@ where
         if this.state < CallState::Writed {
             let req_bytes = req.bytes();
             let mut write_future = stream.write_all(req_bytes);
-
-            ready!(pin_write_future(&mut write_future).poll(cx))?;
+            ready!(Pin::new(&mut write_future).poll(cx))?;
 
             this.state = CallState::Writed;
         }
@@ -182,7 +196,7 @@ where
         let n_de;
         loop {
             let mut read_future =
-                stream.read_with_timeout(&mut buf, configuration.get_read_timeout());
+                timeout::<SLEEP, _>(configuration.get_read_timeout(), stream.read(&mut buf));
             let n = ready!(Pin::new(&mut read_future).poll(cx))?;
             if n == 0 {
                 *parsed_response_bytes_count += 1;
@@ -229,13 +243,3 @@ where
         Poll::Ready(Ok(Cursor::new(Bytes::from(buf_storage[..n_de].to_vec()))))
     }
 }
-
-#[cfg(all(feature = "futures_io", not(feature = "tokio_io"),))]
-#[path = "transport_call_future_tests_with_futures_io.rs"]
-#[cfg(test)]
-mod transport_call_future_tests_with_futures_io;
-
-#[cfg(all(not(feature = "futures_io"), feature = "tokio_io",))]
-#[path = "transport_call_future_tests_with_tokio_io.rs"]
-#[cfg(test)]
-mod transport_call_future_tests_with_tokio_io;

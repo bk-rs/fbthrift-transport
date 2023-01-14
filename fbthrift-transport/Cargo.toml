@@ -16,9 +16,10 @@ readme = "README.md"
 all-features = true
 
 [features]
-# default = ["tokio_io"]
-futures_io = ["futures-x-io/futures_util_io", "futures-x-io-timeoutable/futures_io"]
-tokio_io = ["futures-x-io/tokio_io_util", "futures-x-io-timeoutable/tokio_io"]
+default = ["impl_tokio", "impl_async_io"]
+
+impl_tokio = ["tokio", "async-compat", "async-sleep/impl_tokio"]
+impl_async_io = ["async-io", "async-sleep/impl_async_io"]
 
 [dependencies]
 fbthrift-transport-response-handler = { version = "0.5", path = "../fbthrift-transport-response-handler" }
@@ -28,20 +29,18 @@ bytes = { version = "0.5", default-features = false }
 anyhow = { version = "1", default-features = false }
 const-cstr = { version = "0.3", default-features = false }
 
-futures-core = { version = "0.3", default-features = false }
+futures-util = { version = "0.3", default-features = false, features = ["io"] }
+async-sleep = { version = "0.3", default-features = false, features = ["timeout"] }
 
-futures-x-io = { version = "0.3", default-features = false, optional = true }
-futures-x-io-timeoutable = { version = "0.3", default-features = false, optional = true }
+tokio = { version = "1", default-features = false, features = ["net"], optional = true }
+async-compat = { version = "0.2", default-features = false, optional = true }
+async-io = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["net", "rt-multi-thread", "rt"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 futures-lite = { version = "1" }
-async-io = { version = "1" }
 async-executor = { version = "1" }
 
 [package.metadata.cargo-all-features]
-skip_feature_sets = [
-    ["futures_io", "tokio_io"],
-]
 skip_optional_dependencies = true

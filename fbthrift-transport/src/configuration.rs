@@ -87,6 +87,7 @@ where
     }
 }
 
+//
 pub type DefaultAsyncTransportConfiguration = AsyncTransportConfiguration<DefaultResponseHandler>;
 
 impl Default for DefaultAsyncTransportConfiguration {
@@ -116,5 +117,7 @@ mod tests {
         assert_eq!(c.get_read_timeout(), Duration::from_secs(3));
         c.set_max_parse_response_bytes_count(2);
         assert_eq!(c.get_max_parse_response_bytes_count(), 2);
+
+        println!("{c:?}");
     }
 }

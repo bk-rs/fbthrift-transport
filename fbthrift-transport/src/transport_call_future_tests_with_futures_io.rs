@@ -4,7 +4,7 @@ use super::Call;
 
 //
 use futures_lite::io::Cursor;
-fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
+fn block_on<T>(future: impl core::future::Future<Output = T>) -> T {
     futures_lite::future::block_on(future)
 }
 

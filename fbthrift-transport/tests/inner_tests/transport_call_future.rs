@@ -1,7 +1,7 @@
 use super::*;
 
 use std::{
-    error, io,
+    io::Error as IoError,
     sync::{Arc, Mutex},
 };
 
@@ -10,7 +10,7 @@ use const_cstr::const_cstr;
 use fbthrift_transport_response_handler::ResponseHandler;
 
 #[test]
-fn call_with_static_res() -> Result<(), Box<dyn error::Error>> {
+fn call_with_static_res() -> Result<(), Box<dyn std::error::Error>> {
     #[derive(Clone)]
     pub struct FooResponseHandler;
 
@@ -20,7 +20,7 @@ fn call_with_static_res() -> Result<(), Box<dyn error::Error>> {
             _service_name: &'static str,
             _fn_name: &'static str,
             request_bytes: &[u8],
-        ) -> io::Result<Option<Vec<u8>>> {
+        ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"static" {
                 Some(b"bar".to_vec())
             } else {
@@ -28,7 +28,10 @@ fn call_with_static_res() -> Result<(), Box<dyn error::Error>> {
             })
         }
 
-        fn parse_response_bytes(&mut self, _response_bytes: &[u8]) -> io::Result<Option<usize>> {
+        fn parse_response_bytes(
+            &mut self,
+            _response_bytes: &[u8],
+        ) -> Result<Option<usize>, IoError> {
             unimplemented!()
         }
     }
@@ -59,7 +62,7 @@ fn call_with_static_res() -> Result<(), Box<dyn error::Error>> {
 }
 
 #[test]
-fn call_with_dynamic_res() -> Result<(), Box<dyn error::Error>> {
+fn call_with_dynamic_res() -> Result<(), Box<dyn std::error::Error>> {
     #[derive(Clone)]
     pub struct FooResponseHandler;
 
@@ -69,7 +72,7 @@ fn call_with_dynamic_res() -> Result<(), Box<dyn error::Error>> {
             _service_name: &'static str,
             _fn_name: &'static str,
             request_bytes: &[u8],
-        ) -> io::Result<Option<Vec<u8>>> {
+        ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {
                 None
             } else {
@@ -77,7 +80,10 @@ fn call_with_dynamic_res() -> Result<(), Box<dyn error::Error>> {
             })
         }
 
-        fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>> {
+        fn parse_response_bytes(
+            &mut self,
+            response_bytes: &[u8],
+        ) -> Result<Option<usize>, IoError> {
             if response_bytes == b"89012" {
                 Ok(Some(2))
             } else {
@@ -112,7 +118,7 @@ fn call_with_dynamic_res() -> Result<(), Box<dyn error::Error>> {
 }
 
 #[test]
-fn call_with_dynamic_res_and_less_buf_size() -> Result<(), Box<dyn error::Error>> {
+fn call_with_dynamic_res_and_less_buf_size() -> Result<(), Box<dyn std::error::Error>> {
     #[derive(Clone)]
     pub struct FooResponseHandler;
 
@@ -122,7 +128,7 @@ fn call_with_dynamic_res_and_less_buf_size() -> Result<(), Box<dyn error::Error>
             _service_name: &'static str,
             _fn_name: &'static str,
             request_bytes: &[u8],
-        ) -> io::Result<Option<Vec<u8>>> {
+        ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {
                 None
             } else {
@@ -130,7 +136,10 @@ fn call_with_dynamic_res_and_less_buf_size() -> Result<(), Box<dyn error::Error>
             })
         }
 
-        fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>> {
+        fn parse_response_bytes(
+            &mut self,
+            response_bytes: &[u8],
+        ) -> Result<Option<usize>, IoError> {
             if response_bytes == b"8" {
                 Ok(None)
             } else if response_bytes == b"89" {
@@ -175,7 +184,7 @@ fn call_with_dynamic_res_and_less_buf_size() -> Result<(), Box<dyn error::Error>
 }
 
 #[test]
-fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn error::Error>> {
+fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn std::error::Error>> {
     #[derive(Clone)]
     pub struct FooResponseHandler;
 
@@ -185,7 +194,7 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn error::Er
             _service_name: &'static str,
             _fn_name: &'static str,
             request_bytes: &[u8],
-        ) -> io::Result<Option<Vec<u8>>> {
+        ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {
                 None
             } else {
@@ -193,7 +202,10 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn error::Er
             })
         }
 
-        fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>> {
+        fn parse_response_bytes(
+            &mut self,
+            response_bytes: &[u8],
+        ) -> Result<Option<usize>, IoError> {
             if response_bytes == b"8" {
                 Ok(None)
             } else if response_bytes == b"89" {
@@ -242,7 +254,7 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn error::Er
 }
 
 #[test]
-fn call_with_dynamic_res_and_too_many_read() -> Result<(), Box<dyn error::Error>> {
+fn call_with_dynamic_res_and_too_many_read() -> Result<(), Box<dyn std::error::Error>> {
     #[derive(Clone)]
     pub struct FooResponseHandler;
 
@@ -252,7 +264,7 @@ fn call_with_dynamic_res_and_too_many_read() -> Result<(), Box<dyn error::Error>
             _service_name: &'static str,
             _fn_name: &'static str,
             request_bytes: &[u8],
-        ) -> io::Result<Option<Vec<u8>>> {
+        ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {
                 None
             } else {
@@ -260,7 +272,10 @@ fn call_with_dynamic_res_and_too_many_read() -> Result<(), Box<dyn error::Error>
             })
         }
 
-        fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>> {
+        fn parse_response_bytes(
+            &mut self,
+            response_bytes: &[u8],
+        ) -> Result<Option<usize>, IoError> {
             if response_bytes == b"" {
                 Ok(None)
             } else {

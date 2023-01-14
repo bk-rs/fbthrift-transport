@@ -1,10 +1,11 @@
-use std::{
+use core::{
     future::Future,
-    io,
-    io::Cursor,
     pin::Pin,
-    sync::{Arc, Mutex},
     task::{Context, Poll},
+};
+use std::{
+    io::{Cursor, Error as IoError, ErrorKind as IoErrorKind},
+    sync::{Arc, Mutex},
 };
 
 use bytes::{Buf, Bytes, BytesMut};
@@ -150,9 +151,7 @@ where
         let stream = &mut match this.stream.lock() {
             Ok(stream) => stream,
             Err(err) => {
-                return Poll::Ready(Err(
-                    io::Error::new(io::ErrorKind::Other, err.to_string()).into()
-                ))
+                return Poll::Ready(Err(IoError::new(IoErrorKind::Other, err.to_string()).into()))
             }
         };
         let service_name = &this.service_name;
@@ -189,8 +188,8 @@ where
                 *parsed_response_bytes_count += 1;
                 if *parsed_response_bytes_count > configuration.get_max_parse_response_bytes_count()
                 {
-                    return Poll::Ready(Err(io::Error::new(
-                        io::ErrorKind::Other,
+                    return Poll::Ready(Err(IoError::new(
+                        IoErrorKind::Other,
                         "Reach max parse response bytes count",
                     )
                     .into()));
@@ -202,14 +201,14 @@ where
 
             if let Some(n) = configuration
                 .response_handler
-                .parse_response_bytes(&buf_storage)?
+                .parse_response_bytes(buf_storage)?
             {
                 n_de = n;
                 break;
             } else {
                 if buf_storage.len() >= configuration.get_max_buf_size() {
-                    return Poll::Ready(Err(io::Error::new(
-                        io::ErrorKind::Other,
+                    return Poll::Ready(Err(IoError::new(
+                        IoErrorKind::Other,
                         "Reach max buffer size",
                     )
                     .into()));
@@ -218,8 +217,8 @@ where
                 *parsed_response_bytes_count += 1;
                 if *parsed_response_bytes_count > configuration.get_max_parse_response_bytes_count()
                 {
-                    return Poll::Ready(Err(io::Error::new(
-                        io::ErrorKind::Other,
+                    return Poll::Ready(Err(IoError::new(
+                        IoErrorKind::Other,
                         "Reach max parse response bytes count",
                     )
                     .into()));

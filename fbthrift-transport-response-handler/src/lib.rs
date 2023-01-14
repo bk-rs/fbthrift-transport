@@ -1,4 +1,4 @@
-use std::io;
+use std::io::Error as IoError;
 
 pub trait ResponseHandler: Clone {
     fn try_make_static_response_bytes(
@@ -6,9 +6,9 @@ pub trait ResponseHandler: Clone {
         service_name: &'static str,
         fn_name: &'static str,
         request_bytes: &[u8],
-    ) -> io::Result<Option<Vec<u8>>>;
+    ) -> Result<Option<Vec<u8>>, IoError>;
 
-    fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>>;
+    fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> Result<Option<usize>, IoError>;
 }
 
 #[derive(Clone)]
@@ -20,11 +20,11 @@ impl ResponseHandler for DefaultResponseHandler {
         _service_name: &'static str,
         _fn_name: &'static str,
         _request_bytes: &[u8],
-    ) -> io::Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Vec<u8>>, IoError> {
         Ok(None)
     }
 
-    fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>> {
+    fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> Result<Option<usize>, IoError> {
         Ok(Some(response_bytes.len()))
     }
 }
@@ -33,10 +33,8 @@ impl ResponseHandler for DefaultResponseHandler {
 mod tests {
     use super::*;
 
-    use std::error;
-
     #[test]
-    fn with_default_response_handler() -> Result<(), Box<dyn error::Error>> {
+    fn with_default_response_handler() -> Result<(), Box<dyn std::error::Error>> {
         let mut h = DefaultResponseHandler;
 
         assert_eq!(

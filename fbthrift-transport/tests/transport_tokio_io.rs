@@ -1,6 +1,6 @@
 #[cfg(all(not(feature = "futures_io"), feature = "tokio_io",))]
 mod transport_tokio_io_tests {
-    use std::{error, io};
+    use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 
     use bytes::Bytes;
     use const_cstr::const_cstr;
@@ -25,11 +25,14 @@ mod transport_tokio_io_tests {
             _service_name: &'static str,
             _fn_name: &'static str,
             _request_bytes: &[u8],
-        ) -> io::Result<Option<Vec<u8>>> {
+        ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(None)
         }
 
-        fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>> {
+        fn parse_response_bytes(
+            &mut self,
+            response_bytes: &[u8],
+        ) -> Result<Option<usize>, IoError> {
             Ok(if response_bytes == b"abcde" {
                 Some(5)
             } else {
@@ -39,17 +42,17 @@ mod transport_tokio_io_tests {
     }
 
     #[test]
-    fn simple() -> Result<(), Box<dyn error::Error>> {
+    fn simple() -> Result<(), Box<dyn std::error::Error>> {
         let rt = Runtime::new().unwrap();
 
-        let listener: io::Result<TcpListener> =
+        let listener: Result<TcpListener, IoError> =
             rt.block_on(async move { TcpListener::bind("127.0.0.1:0").await });
 
         let listener = listener?;
 
         let listen_addr_for_client = listener.local_addr()?;
 
-        let server: JoinHandle<io::Result<()>> = rt.spawn(async move {
+        let server: JoinHandle<Result<(), IoError>> = rt.spawn(async move {
             let (mut stream, _) = listener.accept().await?;
 
             let mut n: usize = 0;
@@ -67,7 +70,7 @@ mod transport_tokio_io_tests {
             Ok(())
         });
 
-        let client: io::Result<()> = rt.block_on(async move {
+        let client: Result<(), IoError> = rt.block_on(async move {
             let stream = TcpStream::connect(listen_addr_for_client).await?;
 
             let transport = AsyncTransport::with_default_configuration(stream);
@@ -80,7 +83,7 @@ mod transport_tokio_io_tests {
                         Bytes::from("abcde"),
                     )
                     .await
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+                    .map_err(|err| IoError::new(IoErrorKind::Other, err))?;
 
                 println!("tokio_io transport.call {} {:?}", n, cursor);
 
@@ -94,7 +97,7 @@ mod transport_tokio_io_tests {
             Ok(_) => {}
             Err(err) => {
                 eprintln!("client {:?}", err);
-                assert!(false, err);
+                assert!(false, "{err}");
             }
         }
 

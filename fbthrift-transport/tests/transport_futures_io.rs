@@ -1,7 +1,7 @@
 #[cfg(all(feature = "futures_io", not(feature = "tokio_io")))]
 mod transport_futures_io_tests {
     use std::{
-        error, io,
+        io::{Error as IoError, ErrorKind as IoErrorKind},
         net::{TcpListener, TcpStream},
         sync::Arc,
         thread,
@@ -29,11 +29,14 @@ mod transport_futures_io_tests {
             _service_name: &'static str,
             _fn_name: &'static str,
             _request_bytes: &[u8],
-        ) -> io::Result<Option<Vec<u8>>> {
+        ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(None)
         }
 
-        fn parse_response_bytes(&mut self, response_bytes: &[u8]) -> io::Result<Option<usize>> {
+        fn parse_response_bytes(
+            &mut self,
+            response_bytes: &[u8],
+        ) -> Result<Option<usize>, IoError> {
             Ok(if response_bytes == b"abcde" {
                 Some(5)
             } else {
@@ -43,7 +46,7 @@ mod transport_futures_io_tests {
     }
 
     #[test]
-    fn simple() -> Result<(), Box<dyn error::Error>> {
+    fn simple() -> Result<(), Box<dyn std::error::Error>> {
         let ex = Executor::new();
         let ex = Arc::new(ex);
 
@@ -57,7 +60,7 @@ mod transport_futures_io_tests {
                 .unwrap();
             let listen_addr_for_client = listen_addr_for_server.clone();
 
-            let server: Task<io::Result<()>> = ex.clone().spawn(async move {
+            let server: Task<Result<(), IoError>> = ex.clone().spawn(async move {
                 let listener = Async::<TcpListener>::bind(listen_addr_for_server)?;
 
                 let (mut stream, _) = listener.accept().await?;
@@ -77,7 +80,7 @@ mod transport_futures_io_tests {
                 Ok(())
             });
 
-            let client: Task<io::Result<()>> = ex.clone().spawn(async move {
+            let client: Task<Result<(), IoError>> = ex.clone().spawn(async move {
                 let stream = Async::<TcpStream>::connect(listen_addr_for_client).await?;
 
                 let transport = AsyncTransport::with_default_configuration(stream);
@@ -90,7 +93,7 @@ mod transport_futures_io_tests {
                             Bytes::from("abcde"),
                         )
                         .await
-                        .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+                        .map_err(|err| IoError::new(IoErrorKind::Other, err))?;
 
                     println!("futures_io transport.call {} {:?}", n, cursor);
                     assert_eq!(cursor.into_inner(), Bytes::from("abcde"));

@@ -1,8 +1,4 @@
-#[cfg(all(
-    feature = "futures_io",
-    not(feature = "tokio02_io"),
-    not(feature = "tokio_io")
-))]
+#[cfg(all(feature = "futures_io", not(feature = "tokio_io")))]
 mod transport_futures_io_tests {
     use std::{
         error, io,

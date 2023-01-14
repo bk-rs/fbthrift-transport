@@ -1,7 +1,4 @@
-#[cfg(all(
-    not(feature = "futures_io"),
-    any(feature = "tokio02_io", feature = "tokio_io"),
-))]
+#[cfg(all(not(feature = "futures_io"), feature = "tokio_io",))]
 mod transport_tokio_io_tests {
     use std::{error, io};
 
@@ -9,15 +6,7 @@ mod transport_tokio_io_tests {
     use const_cstr::const_cstr;
     use fbthrift::Transport;
 
-    #[cfg(all(not(feature = "tokio02_io"), feature = "tokio_io"))]
     use tokio::{
-        io::{AsyncReadExt, AsyncWriteExt},
-        net::{TcpListener, TcpStream},
-        runtime::Runtime,
-        task::JoinHandle,
-    };
-    #[cfg(all(feature = "tokio02_io", not(feature = "tokio_io")))]
-    use tokio02::{
         io::{AsyncReadExt, AsyncWriteExt},
         net::{TcpListener, TcpStream},
         runtime::Runtime,
@@ -51,18 +40,12 @@ mod transport_tokio_io_tests {
 
     #[test]
     fn simple() -> Result<(), Box<dyn error::Error>> {
-        #[cfg(all(not(feature = "tokio02_io"), feature = "tokio_io"))]
         let rt = Runtime::new().unwrap();
-        #[cfg(all(feature = "tokio02_io", not(feature = "tokio_io")))]
-        let mut rt = Runtime::new().unwrap();
 
         let listener: io::Result<TcpListener> =
             rt.block_on(async move { TcpListener::bind("127.0.0.1:0").await });
 
-        #[cfg(all(not(feature = "tokio02_io"), feature = "tokio_io"))]
         let listener = listener?;
-        #[cfg(all(feature = "tokio02_io", not(feature = "tokio_io")))]
-        let mut listener = listener?;
 
         let listen_addr_for_client = listener.local_addr()?;
 
@@ -99,10 +82,7 @@ mod transport_tokio_io_tests {
                     .await
                     .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
 
-                #[cfg(all(not(feature = "tokio02_io"), feature = "tokio_io"))]
                 println!("tokio_io transport.call {} {:?}", n, cursor);
-                #[cfg(all(feature = "tokio02_io", not(feature = "tokio_io")))]
-                println!("tokio02_io transport.call {} {:?}", n, cursor);
 
                 assert_eq!(cursor.into_inner(), Bytes::from("abcde"));
             }
@@ -118,7 +98,6 @@ mod transport_tokio_io_tests {
             }
         }
 
-        #[cfg(all(not(feature = "tokio02_io"), feature = "tokio_io"))]
         server.abort();
 
         drop(server);

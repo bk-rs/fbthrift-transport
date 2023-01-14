@@ -231,29 +231,12 @@ where
     }
 }
 
-#[cfg(all(
-    feature = "futures_io",
-    not(feature = "tokio02_io"),
-    not(feature = "tokio_io"),
-))]
+#[cfg(all(feature = "futures_io", not(feature = "tokio_io"),))]
 #[path = "transport_call_future_tests_with_futures_io.rs"]
 #[cfg(test)]
 mod transport_call_future_tests_with_futures_io;
 
-#[cfg(all(
-    not(feature = "futures_io"),
-    feature = "tokio02_io",
-    not(feature = "tokio_io"),
-))]
-#[path = "transport_call_future_tests_with_tokio02_io.rs"]
-#[cfg(test)]
-mod transport_call_future_tests_with_tokio02_io;
-
-#[cfg(all(
-    not(feature = "futures_io"),
-    not(feature = "tokio02_io"),
-    feature = "tokio_io",
-))]
+#[cfg(all(not(feature = "futures_io"), feature = "tokio_io",))]
 #[path = "transport_call_future_tests_with_tokio_io.rs"]
 #[cfg(test)]
 mod transport_call_future_tests_with_tokio_io;

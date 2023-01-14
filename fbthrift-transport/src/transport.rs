@@ -1,33 +1,33 @@
 use core::{
     future::Future,
     marker::PhantomData,
+    ops::DerefMut as _,
     pin::Pin,
     task::{Context, Poll},
 };
 use std::{
     io::{Cursor, Error as IoError, ErrorKind as IoErrorKind},
-    ops::DerefMut as _,
     sync::{Arc, Mutex},
 };
 
 use async_sleep::Sleepble;
-use bytes::{Buf, Bytes, BytesMut};
+use bytes::{Buf as _, Bytes, BytesMut};
 use const_cstr::ConstCStr;
 use fbthrift::{Framing, FramingDecoded, FramingEncodedFinal, Transport};
-use fbthrift_transport_response_handler::{DefaultResponseHandler, ResponseHandler};
+use fbthrift_transport_response_handler::ResponseHandler;
 use futures_util::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt as _},
     ready,
 };
 
-use crate::configuration::{AsyncTransportConfiguration, DefaultAsyncTransportConfiguration};
+use crate::configuration::AsyncTransportConfiguration;
 
 //
 pub struct AsyncTransport<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     SLEEP: Sleepble,
-    H: ResponseHandler,
+    H: ResponseHandler + Unpin,
 {
     stream: Arc<Mutex<S>>,
     configuration: AsyncTransportConfiguration<H>,
@@ -49,25 +49,51 @@ where
     }
 }
 
-impl<S, SLEEP> AsyncTransport<S, SLEEP, DefaultResponseHandler>
+#[cfg(feature = "impl_tokio")]
+impl<H> AsyncTransport<crate::impl_tokio::TokioTcpStream, crate::impl_tokio::TokioSleep, H>
 where
-    S: AsyncRead + AsyncWrite + Unpin,
-    SLEEP: Sleepble,
+    H: ResponseHandler + Unpin,
 {
-    pub fn with_default_configuration(stream: S) -> Self {
-        Self {
+    pub async fn with_tokio_tcp_connect<A: tokio::net::ToSocketAddrs>(
+        addr: A,
+        configuration: AsyncTransportConfiguration<H>,
+    ) -> Result<Self, IoError> {
+        let stream = crate::impl_tokio::tcp_connect(addr).await?;
+
+        Ok(Self {
             stream: Arc::new(Mutex::new(stream)),
-            configuration: DefaultAsyncTransportConfiguration::default(),
+            configuration,
             phantom: PhantomData,
-        }
+        })
     }
 }
 
+#[cfg(feature = "impl_async_io")]
+impl<H>
+    AsyncTransport<crate::impl_async_io::AsyncIoTcpStream, crate::impl_async_io::AsyncIoSleep, H>
+where
+    H: ResponseHandler + Unpin,
+{
+    pub async fn with_async_io_tcp_connect<A: Into<std::net::SocketAddr>>(
+        addr: A,
+        configuration: AsyncTransportConfiguration<H>,
+    ) -> Result<Self, IoError> {
+        let stream = crate::impl_async_io::tcp_connect(addr).await?;
+
+        Ok(Self {
+            stream: Arc::new(Mutex::new(stream)),
+            configuration,
+            phantom: PhantomData,
+        })
+    }
+}
+
+//
 impl<S, SLEEP, H> Framing for AsyncTransport<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     SLEEP: Sleepble,
-    H: ResponseHandler,
+    H: ResponseHandler + Unpin,
 {
     type EncBuf = BytesMut;
     type DecBuf = Cursor<Bytes>;
@@ -103,6 +129,7 @@ where
     }
 }
 
+//
 #[derive(PartialEq, PartialOrd)]
 enum CallState {
     Pending,
@@ -113,7 +140,7 @@ struct Call<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     SLEEP: Sleepble,
-    H: ResponseHandler,
+    H: ResponseHandler + Unpin,
 {
     stream: Arc<Mutex<S>>,
     service_name: ConstCStr,
@@ -130,7 +157,7 @@ impl<S, SLEEP, H> Call<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     SLEEP: Sleepble,
-    H: ResponseHandler,
+    H: ResponseHandler + Unpin,
 {
     fn new(
         stream: Arc<Mutex<S>>,

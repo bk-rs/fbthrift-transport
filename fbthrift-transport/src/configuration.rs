@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use fbthrift_transport_response_handler::{DefaultResponseHandler, ResponseHandler};
+use fbthrift_transport_response_handler::ResponseHandler;
 
 //
 #[derive(Clone)]
@@ -87,22 +87,15 @@ where
     }
 }
 
-//
-pub type DefaultAsyncTransportConfiguration = AsyncTransportConfiguration<DefaultResponseHandler>;
-
-impl Default for DefaultAsyncTransportConfiguration {
-    fn default() -> Self {
-        Self::new(DefaultResponseHandler)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use fbthrift_transport_response_handler::MockResponseHandler;
+
     #[test]
-    fn get_and_set() {
-        let mut c: DefaultAsyncTransportConfiguration = Default::default();
+    fn test_get_and_set() {
+        let mut c = AsyncTransportConfiguration::new(MockResponseHandler);
 
         assert_eq!(c.get_buf_size(), 1024);
         assert_eq!(c.get_max_buf_size(), 1024 * 4);

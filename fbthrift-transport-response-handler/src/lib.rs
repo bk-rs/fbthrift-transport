@@ -18,11 +18,11 @@ pub trait ResponseHandler: Clone {
 
 //
 #[derive(Debug, Clone, Copy)]
-pub struct DefaultResponseHandler;
+pub struct MockResponseHandler;
 
-impl ResponseHandler for DefaultResponseHandler {
+impl ResponseHandler for MockResponseHandler {
     fn name(&self) -> Option<&str> {
-        Some("Default")
+        Some("Mock")
     }
 
     fn try_make_static_response_bytes(
@@ -44,8 +44,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn with_default_response_handler() -> Result<(), Box<dyn std::error::Error>> {
-        let mut h = DefaultResponseHandler;
+    fn test_mock_response_handler() -> Result<(), Box<dyn std::error::Error>> {
+        let mut h = MockResponseHandler;
 
         assert_eq!(
             h.try_make_static_response_bytes("my_service", "my_fn", &b""[..])?,

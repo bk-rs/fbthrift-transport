@@ -6,16 +6,17 @@ use core::{
 };
 use std::{
     io::{Cursor, Error as IoError, ErrorKind as IoErrorKind},
+    ops::DerefMut as _,
     sync::{Arc, Mutex},
 };
 
-use async_sleep::{timeout, Sleepble};
+use async_sleep::Sleepble;
 use bytes::{Buf, Bytes, BytesMut};
 use const_cstr::ConstCStr;
 use fbthrift::{Framing, FramingDecoded, FramingEncodedFinal, Transport};
 use fbthrift_transport_response_handler::{DefaultResponseHandler, ResponseHandler};
 use futures_util::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    io::{AsyncRead, AsyncWrite, AsyncWriteExt as _},
     ready,
 };
 
@@ -195,9 +196,14 @@ where
         let mut buf = vec![0u8; configuration.get_buf_size()];
         let n_de;
         loop {
-            let mut read_future =
-                timeout::<SLEEP, _>(configuration.get_read_timeout(), stream.read(&mut buf));
-            let n = ready!(Pin::new(&mut read_future).poll(cx))?;
+            let read_future = async_read_poll(
+                stream.deref_mut(),
+                &mut buf,
+                &mut SLEEP::sleep(configuration.get_read_timeout()).wait(),
+                cx,
+            );
+            let n = ready!(read_future)?;
+
             if n == 0 {
                 *parsed_response_bytes_count += 1;
                 if *parsed_response_bytes_count > configuration.get_max_parse_response_bytes_count()
@@ -241,5 +247,22 @@ where
         }
 
         Poll::Ready(Ok(Cursor::new(Bytes::from(buf_storage[..n_de].to_vec()))))
+    }
+}
+
+fn async_read_poll<R: AsyncRead + Unpin>(
+    reader: &mut R,
+    buf: &mut [u8],
+    delay: &mut Pin<Box<dyn Future<Output = ()> + Send + 'static>>,
+    cx: &mut Context<'_>,
+) -> Poll<Result<usize, IoError>> {
+    let poll_ret = Pin::new(reader).poll_read(cx, buf);
+
+    match poll_ret {
+        Poll::Ready(ret) => Poll::Ready(ret),
+        Poll::Pending => match delay.as_mut().poll(cx) {
+            Poll::Ready(_) => Poll::Ready(Err(IoError::new(IoErrorKind::TimedOut, "read timeout"))),
+            Poll::Pending => Poll::Pending,
+        },
     }
 }

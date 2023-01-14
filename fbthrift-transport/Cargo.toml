@@ -1,0 +1,52 @@
+[package]
+name = "fbthrift-transport"
+version = "0.7.0"
+authors = ["vkill <vkill.net@gmail.com>"]
+edition = "2018"
+description = "fbthrift transport."
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/bk-rs/fbthrift-transport"
+homepage = "https://github.com/bk-rs/fbthrift-transport"
+documentation = "https://docs.rs/fbthrift-transport"
+keywords = []
+categories = []
+readme = "README.md"
+
+[package.metadata.docs.rs]
+features = [ "futures_io", "tokio02_io", "tokio_io" ]
+
+[features]
+# default = ["tokio_io"]
+futures_io = ["futures-x-io/futures_util_io", "futures-x-io-timeoutable/futures_io"]
+tokio02_io = ["futures-x-io/tokio02_io_util", "futures-x-io-timeoutable/tokio02_io"]
+tokio_io = ["futures-x-io/tokio_io_util", "futures-x-io-timeoutable/tokio_io"]
+
+[dependencies]
+fbthrift = { version = "=0.0.6", default-features = false, features = [], package = "fbthrift-git" }
+bytes = { version = "0.5", default-features = false, features = [] }
+anyhow = { version = "1.0", default-features = false, features = [] }
+futures-core = { version = "0.3", default-features = false, features = [] }
+const-cstr = { version = "0.3", default-features = false, features = [] }
+
+fbthrift-transport-response-handler = { path = "../fbthrift-transport-response-handler", version = "=0.5.0" }
+
+futures-x-io = { version = "0.3", default-features = false, features = [], optional = true }
+futures-x-io-timeoutable = { version = "0.3", default-features = false, features = [], optional = true }
+
+[dev-dependencies]
+futures-lite = { version = "1.11", default-features = false, features = [] }
+async-io = { version = "1.3", default-features = false, features = [] }
+
+tokio02 = { version = "~0.2", default-features = false, features = ["net", "rt-core"], package = "tokio" }
+tokio = { version = "1.4", default-features = false, features = ["net", "rt-multi-thread", "rt"] }
+
+async-executor = { version = "1.4" }
+
+[package.metadata.cargo-all-features]
+skip_feature_sets = [
+    ["futures_io", "tokio02_io"],
+    ["futures_io", "tokio_io"],
+
+    ["tokio02_io", "tokio_io"],
+]
+skip_optional_dependencies = true

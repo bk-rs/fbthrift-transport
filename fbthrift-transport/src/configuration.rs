@@ -2,6 +2,7 @@ use core::time::Duration;
 
 use fbthrift_transport_response_handler::{DefaultResponseHandler, ResponseHandler};
 
+//
 #[derive(Clone)]
 pub struct AsyncTransportConfiguration<H>
 where
@@ -12,6 +13,27 @@ where
     read_timeout: Duration,
     max_parse_response_bytes_count: u8,
     pub(crate) response_handler: H,
+}
+
+impl<H> core::fmt::Debug for AsyncTransportConfiguration<H>
+where
+    H: ResponseHandler,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AsyncTransportConfiguration")
+            .field("buf_size", &self.buf_size)
+            .field("max_buf_size", &self.max_buf_size)
+            .field("read_timeout", &self.read_timeout)
+            .field(
+                "max_parse_response_bytes_count",
+                &self.max_parse_response_bytes_count,
+            )
+            .field(
+                "response_handler",
+                &self.response_handler.name().unwrap_or_default(),
+            )
+            .finish()
+    }
 }
 
 impl<H> AsyncTransportConfiguration<H>

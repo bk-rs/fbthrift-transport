@@ -142,18 +142,10 @@ fn call_with_dynamic_res_and_less_buf_size() -> Result<(), Box<dyn std::error::E
             &mut self,
             response_bytes: &[u8],
         ) -> Result<Option<usize>, IoError> {
-            if response_bytes == b"8" {
-                Ok(None)
-            } else if response_bytes == b"89" {
-                Ok(None)
-            } else if response_bytes == b"890" {
-                Ok(None)
-            } else if response_bytes == b"8901" {
-                Ok(None)
-            } else if response_bytes == b"89012" {
-                Ok(Some(4))
-            } else {
-                unimplemented!()
+            match response_bytes {
+                b"8" | b"89" | b"890" | b"8901" => Ok(None),
+                b"89012" => Ok(Some(4)),
+                _ => unimplemented!(),
             }
         }
     }
@@ -208,18 +200,10 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn std::erro
             &mut self,
             response_bytes: &[u8],
         ) -> Result<Option<usize>, IoError> {
-            if response_bytes == b"8" {
-                Ok(None)
-            } else if response_bytes == b"89" {
-                Ok(None)
-            } else if response_bytes == b"890" {
-                Ok(None)
-            } else if response_bytes == b"8901" {
-                Ok(None)
-            } else if response_bytes == b"89012" {
-                Ok(Some(4))
-            } else {
-                unimplemented!()
+            match response_bytes {
+                b"8" | b"89" | b"890" | b"8901" => Ok(None),
+                b"89012" => Ok(Some(4)),
+                _ => unimplemented!(),
             }
         }
     }
@@ -243,7 +227,7 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn std::erro
         );
 
         match call.await {
-            Ok(_) => assert!(false),
+            Ok(_) => panic!(),
             Err(err) => {
                 assert!(err.to_string() == "Reach max buffer size");
             }
@@ -303,7 +287,7 @@ fn call_with_dynamic_res_and_too_many_read() -> Result<(), Box<dyn std::error::E
         );
 
         match call.await {
-            Ok(_) => assert!(false),
+            Ok(_) => panic!(),
             Err(err) => {
                 assert!(err.to_string() == "Reach max parse response bytes count");
             }

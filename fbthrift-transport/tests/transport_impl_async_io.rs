@@ -1,24 +1,29 @@
-#[cfg(all(feature = "futures_io", not(feature = "tokio_io")))]
-mod transport_futures_io_tests {
+#![cfg(feature = "impl_async_io")]
+
+#[cfg(test)]
+mod transport_impl_async_io_tests {
     use std::{
         io::{Error as IoError, ErrorKind as IoErrorKind},
-        net::{TcpListener, TcpStream},
+        net::TcpListener,
         sync::Arc,
         thread,
     };
 
-    use async_executor::{Executor, Task};
-    use async_io::Async;
     use bytes::Bytes;
     use const_cstr::const_cstr;
-    use fbthrift::Transport;
+    use fbthrift::Transport as _;
+
+    use async_executor::{Executor, Task};
+    use async_io::Async;
     use futures_lite::{
         future::{self, block_on},
-        io::{AsyncReadExt, AsyncWriteExt},
+        io::{AsyncReadExt as _, AsyncWriteExt as _},
     };
 
-    use fbthrift_transport::AsyncTransport;
-    use fbthrift_transport_response_handler::ResponseHandler;
+    use fbthrift_transport::{
+        fbthrift_transport_response_handler::{MockResponseHandler, ResponseHandler},
+        AsyncTransport, AsyncTransportConfiguration,
+    };
 
     #[derive(Clone)]
     pub struct FooResponseHandler;
@@ -58,7 +63,7 @@ mod transport_futures_io_tests {
                 .unwrap()
                 .local_addr()
                 .unwrap();
-            let listen_addr_for_client = listen_addr_for_server.clone();
+            let listen_addr_for_client = listen_addr_for_server;
 
             let server: Task<Result<(), IoError>> = ex.clone().spawn(async move {
                 let listener = Async::<TcpListener>::bind(listen_addr_for_server)?;
@@ -81,9 +86,11 @@ mod transport_futures_io_tests {
             });
 
             let client: Task<Result<(), IoError>> = ex.clone().spawn(async move {
-                let stream = Async::<TcpStream>::connect(listen_addr_for_client).await?;
-
-                let transport = AsyncTransport::with_default_configuration(stream);
+                let transport = AsyncTransport::with_async_io_tcp_connect(
+                    listen_addr_for_client,
+                    AsyncTransportConfiguration::new(MockResponseHandler),
+                )
+                .await?;
 
                 for n in 0..10_usize {
                     let cursor = transport
@@ -95,7 +102,7 @@ mod transport_futures_io_tests {
                         .await
                         .map_err(|err| IoError::new(IoErrorKind::Other, err))?;
 
-                    println!("futures_io transport.call {} {:?}", n, cursor);
+                    println!("futures_io transport.call {n} {cursor:?}");
                     assert_eq!(cursor.into_inner(), Bytes::from("abcde"));
                 }
 
@@ -103,9 +110,22 @@ mod transport_futures_io_tests {
             });
 
             client.await?;
-            server.cancel().await;
+            assert!(server.cancel().await.is_some());
 
             Ok(())
         })
     }
 }
+
+//
+//
+//
+pub type Sleep = fbthrift_transport::impl_async_io::AsyncIoSleep;
+
+fn block_on<T>(future: impl core::future::Future<Output = T>) -> T {
+    futures_lite::future::block_on(future)
+}
+
+#[cfg(test)]
+#[path = "./inner_tests/transport_call_future.rs"]
+mod transport_impl_async_io_call_tests;

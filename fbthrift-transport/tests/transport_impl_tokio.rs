@@ -126,4 +126,4 @@ fn block_on<T>(future: impl core::future::Future<Output = T>) -> T {
 
 #[cfg(test)]
 #[path = "./inner_tests/transport_call_future.rs"]
-mod transport_impl_tokio_inner_tests;
+mod transport_impl_tokio_call_tests;

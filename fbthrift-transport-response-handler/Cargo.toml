@@ -1,6 +1,6 @@
 [package]
 name = "fbthrift-transport-response-handler"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["vkill <vkill.net@gmail.com>"]
 edition = "2021"
 description = "fbthrift transport response handler."

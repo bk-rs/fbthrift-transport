@@ -136,7 +136,7 @@ enum CallState {
     Writed,
 }
 
-struct Call<S, SLEEP, H>
+pub struct Call<S, SLEEP, H>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     SLEEP: Sleepble,
@@ -159,7 +159,7 @@ where
     SLEEP: Sleepble,
     H: ResponseHandler + Unpin,
 {
-    fn new(
+    pub fn new(
         stream: Arc<Mutex<S>>,
         service_name: ConstCStr,
         fn_name: ConstCStr,

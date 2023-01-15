@@ -1,20 +1,24 @@
-#[cfg(all(not(feature = "futures_io"), feature = "tokio_io",))]
-mod transport_tokio_io_tests {
+#![cfg(feature = "impl_tokio")]
+
+#[cfg(test)]
+mod transport_impl_tokio_tests {
     use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 
     use bytes::Bytes;
     use const_cstr::const_cstr;
-    use fbthrift::Transport;
+    use fbthrift::Transport as _;
 
     use tokio::{
-        io::{AsyncReadExt, AsyncWriteExt},
-        net::{TcpListener, TcpStream},
+        io::{AsyncReadExt as _, AsyncWriteExt as _},
+        net::TcpListener,
         runtime::Runtime,
         task::JoinHandle,
     };
 
-    use fbthrift_transport::AsyncTransport;
-    use fbthrift_transport_response_handler::ResponseHandler;
+    use fbthrift_transport::{
+        fbthrift_transport_response_handler::{MockResponseHandler, ResponseHandler},
+        AsyncTransport, AsyncTransportConfiguration,
+    };
 
     #[derive(Clone)]
     pub struct FooResponseHandler;
@@ -71,9 +75,11 @@ mod transport_tokio_io_tests {
         });
 
         let client: Result<(), IoError> = rt.block_on(async move {
-            let stream = TcpStream::connect(listen_addr_for_client).await?;
-
-            let transport = AsyncTransport::with_default_configuration(stream);
+            let transport = AsyncTransport::with_tokio_tcp_connect(
+                listen_addr_for_client,
+                AsyncTransportConfiguration::new(MockResponseHandler),
+            )
+            .await?;
 
             for n in 0..10_usize {
                 let cursor = transport
@@ -85,7 +91,7 @@ mod transport_tokio_io_tests {
                     .await
                     .map_err(|err| IoError::new(IoErrorKind::Other, err))?;
 
-                println!("tokio_io transport.call {} {:?}", n, cursor);
+                println!("transport_impl_tokio transport.call {n} {cursor:?}");
 
                 assert_eq!(cursor.into_inner(), Bytes::from("abcde"));
             }
@@ -96,15 +102,28 @@ mod transport_tokio_io_tests {
         match client {
             Ok(_) => {}
             Err(err) => {
-                eprintln!("client {:?}", err);
-                assert!(false, "{err}");
+                panic!("{err}");
             }
         }
 
-        server.abort();
-
-        drop(server);
+        rt.block_on(async move {
+            assert!(server.await.ok().is_some());
+        });
 
         Ok(())
     }
 }
+
+//
+//
+//
+pub type Sleep = fbthrift_transport::impl_tokio::TokioSleep;
+
+fn block_on<T>(future: impl core::future::Future<Output = T>) -> T {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(future)
+}
+
+#[cfg(test)]
+#[path = "./inner_tests/transport_call_future.rs"]
+mod transport_impl_tokio_inner_tests;

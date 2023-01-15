@@ -37,7 +37,7 @@ async-compat = { version = "0.2", default-features = false, optional = true }
 async-io = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-util"] }
 
 futures-lite = { version = "1" }
 async-executor = { version = "1" }

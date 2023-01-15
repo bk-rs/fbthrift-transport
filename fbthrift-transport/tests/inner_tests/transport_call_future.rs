@@ -1,4 +1,4 @@
-use super::*;
+use super::{block_on, Sleep};
 
 use std::{
     io::Error as IoError,
@@ -7,7 +7,9 @@ use std::{
 
 use bytes::Bytes;
 use const_cstr::const_cstr;
+use fbthrift_transport::{transport::Call, AsyncTransportConfiguration};
 use fbthrift_transport_response_handler::ResponseHandler;
+use futures_util::io::Cursor;
 
 #[test]
 fn call_with_static_res() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,7 +46,7 @@ fn call_with_static_res() -> Result<(), Box<dyn std::error::Error>> {
 
         //
         let req = Bytes::from("static");
-        let call = Call::new(
+        let call = Call::<_, Sleep, _>::new(
             stream.clone(),
             const_cstr!("my_service"),
             const_cstr!("my_fn"),
@@ -100,7 +102,7 @@ fn call_with_dynamic_res() -> Result<(), Box<dyn std::error::Error>> {
 
         //
         let req = Bytes::from("dynamic");
-        let call = Call::new(
+        let call = Call::<_, Sleep, _>::new(
             stream.clone(),
             const_cstr!("my_service"),
             const_cstr!("my_fn"),
@@ -166,7 +168,7 @@ fn call_with_dynamic_res_and_less_buf_size() -> Result<(), Box<dyn std::error::E
 
         //
         let req = Bytes::from("dynamic");
-        let call = Call::new(
+        let call = Call::<_, Sleep, _>::new(
             stream.clone(),
             const_cstr!("my_service"),
             const_cstr!("my_fn"),
@@ -232,7 +234,7 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn std::erro
 
         //
         let req = Bytes::from("dynamic");
-        let call = Call::new(
+        let call = Call::<_, Sleep, _>::new(
             stream.clone(),
             const_cstr!("my_service"),
             const_cstr!("my_fn"),
@@ -292,7 +294,7 @@ fn call_with_dynamic_res_and_too_many_read() -> Result<(), Box<dyn std::error::E
 
         //
         let req = Bytes::from("dynamic");
-        let call = Call::new(
+        let call = Call::<_, Sleep, _>::new(
             stream.clone(),
             const_cstr!("my_service"),
             const_cstr!("my_fn"),

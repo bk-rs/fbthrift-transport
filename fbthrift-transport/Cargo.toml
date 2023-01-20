@@ -30,7 +30,7 @@ anyhow = { version = "1", default-features = false }
 const-cstr = { version = "0.3", default-features = false }
 
 futures-util = { version = "0.3", default-features = false, features = ["io"] }
-async-sleep = { version = "0.3", default-features = false, features = ["timeout"] }
+async-sleep = { version = "0.4", default-features = false, features = ["rw"] }
 
 tokio = { version = "1", default-features = false, features = ["net"], optional = true }
 async-compat = { version = "0.2", default-features = false, optional = true }

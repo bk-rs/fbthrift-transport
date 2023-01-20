@@ -1,4 +1,5 @@
 use core::{
+    ffi::CStr,
     future::Future,
     marker::PhantomData,
     pin::Pin,
@@ -10,16 +11,20 @@ use std::{
 };
 
 use async_sleep::{AsyncReadWithTimeoutExt as _, Sleepble};
-use bytes::{Buf as _, Bytes, BytesMut};
-use const_cstr::ConstCStr;
+use bytes::{Bytes, BytesMut};
 use fbthrift::{Framing, FramingDecoded, FramingEncodedFinal, Transport};
 use fbthrift_transport_response_handler::ResponseHandler;
 use futures_util::{
+    future::BoxFuture,
     io::{AsyncRead, AsyncWrite, AsyncWriteExt as _},
     ready,
 };
 
 use crate::configuration::AsyncTransportConfiguration;
+
+//
+#[derive(Debug, Clone, Default)]
+pub struct AsyncTransportRpcOptions {}
 
 //
 pub struct AsyncTransport<S, SLEEP, H>
@@ -96,33 +101,33 @@ where
 {
     type EncBuf = BytesMut;
     type DecBuf = Cursor<Bytes>;
-    type Meta = ();
 
     fn enc_with_capacity(cap: usize) -> Self::EncBuf {
         Self::EncBuf::with_capacity(cap)
     }
-
-    fn get_meta(&self) {}
 }
 
 impl<S, SLEEP, H> Transport for AsyncTransport<S, SLEEP, H>
 where
-    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
-    SLEEP: Sleepble + Send + 'static,
-    H: ResponseHandler + Unpin + Send + 'static,
+    S: AsyncRead + AsyncWrite + Unpin + Send + Sync + 'static,
+    SLEEP: Sleepble + Send + Sync + 'static,
+    H: ResponseHandler + Unpin + Send + Sync + 'static,
 {
+    type RpcOptions = AsyncTransportRpcOptions;
+
     fn call(
         &self,
-        service_name: &ConstCStr,
-        fn_name: &ConstCStr,
+        service_name: &'static CStr,
+        fn_name: &'static CStr,
         req: FramingEncodedFinal<Self>,
-    ) -> Pin<Box<dyn Future<Output = Result<FramingDecoded<Self>, anyhow::Error>> + Send + 'static>>
-    {
+        rpc_options: Self::RpcOptions,
+    ) -> BoxFuture<'static, anyhow::Result<FramingDecoded<Self>>> {
         Pin::from(Box::new(Call::<S, SLEEP, H>::new(
             self.stream.clone(),
-            service_name.to_owned(),
-            fn_name.to_owned(),
+            service_name,
+            fn_name,
             req,
+            rpc_options,
             self.configuration.clone(),
         )))
     }
@@ -142,9 +147,11 @@ where
     H: ResponseHandler + Unpin,
 {
     stream: Arc<Mutex<S>>,
-    service_name: ConstCStr,
-    fn_name: ConstCStr,
+    service_name: &'static CStr,
+    fn_name: &'static CStr,
     req: FramingEncodedFinal<AsyncTransport<S, SLEEP, H>>,
+    #[allow(dead_code)]
+    rpc_options: AsyncTransportRpcOptions,
     configuration: AsyncTransportConfiguration<H>,
     //
     state: CallState,
@@ -160,9 +167,10 @@ where
 {
     pub fn new(
         stream: Arc<Mutex<S>>,
-        service_name: ConstCStr,
-        fn_name: ConstCStr,
+        service_name: &'static CStr,
+        fn_name: &'static CStr,
         req: FramingEncodedFinal<AsyncTransport<S, SLEEP, H>>,
+        rpc_options: AsyncTransportRpcOptions,
         configuration: AsyncTransportConfiguration<H>,
     ) -> Self {
         let max_buf_size = configuration.get_max_buf_size();
@@ -172,6 +180,7 @@ where
             service_name,
             fn_name,
             req,
+            rpc_options,
             configuration,
             state: CallState::Pending,
             buf_storage: Vec::with_capacity(max_buf_size),
@@ -204,8 +213,7 @@ where
         let parsed_response_bytes_count = &mut this.parsed_response_bytes_count;
 
         if this.state < CallState::Writed {
-            let req_bytes = req.bytes();
-            let mut write_future = stream.write_all(req_bytes);
+            let mut write_future = stream.write_all(&req[..]);
             ready!(Pin::new(&mut write_future).poll(cx))?;
 
             this.state = CallState::Writed;
@@ -213,7 +221,21 @@ where
 
         let static_res_buf = configuration
             .response_handler
-            .try_make_static_response_bytes(service_name.to_str(), fn_name.to_str(), req.bytes())?;
+            .try_make_static_response_bytes(
+                service_name.to_str().map_err(|err| {
+                    IoError::new(
+                        IoErrorKind::Other,
+                        format!("service_name.to_str failed, err:{err}"),
+                    )
+                })?,
+                fn_name.to_str().map_err(|err| {
+                    IoError::new(
+                        IoErrorKind::Other,
+                        format!("fn_name.to_str failed, err:{err}"),
+                    )
+                })?,
+                &req[..],
+            )?;
         if let Some(static_res_buf) = static_res_buf {
             debug_assert!(buf_storage.is_empty(), "The buf_storage should empty");
             return Poll::Ready(Ok(Cursor::new(Bytes::from(static_res_buf))));

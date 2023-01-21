@@ -1,4 +1,3 @@
-use core::ffi::CStr;
 use std::io::Error as IoError;
 
 //
@@ -9,8 +8,8 @@ pub trait ResponseHandler: Clone {
 
     fn try_make_static_response_bytes(
         &mut self,
-        service_name: &'static CStr,
-        fn_name: &'static CStr,
+        service_name: &'static [u8],
+        fn_name: &'static [u8],
         request_bytes: &[u8],
     ) -> Result<Option<Vec<u8>>, IoError>;
 
@@ -28,8 +27,8 @@ impl ResponseHandler for MockResponseHandler {
 
     fn try_make_static_response_bytes(
         &mut self,
-        _service_name: &'static CStr,
-        _fn_name: &'static CStr,
+        _service_name: &'static [u8],
+        _fn_name: &'static [u8],
         _request_bytes: &[u8],
     ) -> Result<Option<Vec<u8>>, IoError> {
         Ok(None)
@@ -49,11 +48,7 @@ mod tests {
         let mut h = MockResponseHandler;
 
         assert_eq!(
-            h.try_make_static_response_bytes(
-                CStr::from_bytes_with_nul(b"my_service\0").expect(""),
-                CStr::from_bytes_with_nul(b"my_fn\0").expect(""),
-                &b""[..]
-            )?,
+            h.try_make_static_response_bytes(b"my_service", b"my_fn", &b""[..])?,
             None
         );
 

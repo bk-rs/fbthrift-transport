@@ -31,8 +31,8 @@ mod transport_impl_async_io_tests {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static CStr,
-            _fn_name: &'static CStr,
+            _service_name: &'static [u8],
+            _fn_name: &'static [u8],
             _request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(None)

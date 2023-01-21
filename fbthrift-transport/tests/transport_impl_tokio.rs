@@ -26,12 +26,12 @@ mod transport_impl_tokio_tests {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            service_name: &'static CStr,
-            fn_name: &'static CStr,
+            service_name: &'static [u8],
+            fn_name: &'static [u8],
             _request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
-            assert_eq!(service_name.to_str().expect(""), "my_service");
-            assert_eq!(fn_name.to_str().expect(""), "my_fn");
+            assert_eq!(service_name, b"my_service");
+            assert_eq!(fn_name, b"my_fn");
             Ok(None)
         }
 

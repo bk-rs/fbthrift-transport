@@ -1,6 +1,6 @@
 [package]
 name = "fbthrift-transport"
-version = "0.8.1"
+version = "0.9.0"
 authors = ["vkill <vkill.net@gmail.com>"]
 edition = "2021"
 description = "fbthrift transport."
@@ -22,7 +22,7 @@ impl_tokio = ["tokio", "async-compat", "async-sleep/impl_tokio"]
 impl_async_io = ["async-io", "async-sleep/impl_async_io"]
 
 [dependencies]
-fbthrift-transport-response-handler = { version = "0.6", path = "../fbthrift-transport-response-handler" }
+fbthrift-transport-response-handler = { version = "0.7", path = "../fbthrift-transport-response-handler" }
 
 fbthrift = { version = "=0.0.7", default-features = false, package = "fbthrift-git" }
 bytes = { version = "1", default-features = false }

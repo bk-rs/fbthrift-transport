@@ -221,21 +221,7 @@ where
 
         let static_res_buf = configuration
             .response_handler
-            .try_make_static_response_bytes(
-                service_name.to_str().map_err(|err| {
-                    IoError::new(
-                        IoErrorKind::Other,
-                        format!("service_name.to_str failed, err:{err}"),
-                    )
-                })?,
-                fn_name.to_str().map_err(|err| {
-                    IoError::new(
-                        IoErrorKind::Other,
-                        format!("fn_name.to_str failed, err:{err}"),
-                    )
-                })?,
-                &req[..],
-            )?;
+            .try_make_static_response_bytes(service_name, fn_name, &req[..])?;
         if let Some(static_res_buf) = static_res_buf {
             debug_assert!(buf_storage.is_empty(), "The buf_storage should empty");
             return Poll::Ready(Ok(Cursor::new(Bytes::from(static_res_buf))));

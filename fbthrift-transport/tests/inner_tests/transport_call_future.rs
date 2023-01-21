@@ -19,8 +19,8 @@ fn call_with_static_res() -> Result<(), Box<dyn std::error::Error>> {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static str,
-            _fn_name: &'static str,
+            _service_name: &'static CStr,
+            _fn_name: &'static CStr,
             request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"static" {
@@ -72,8 +72,8 @@ fn call_with_dynamic_res() -> Result<(), Box<dyn std::error::Error>> {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static str,
-            _fn_name: &'static str,
+            _service_name: &'static CStr,
+            _fn_name: &'static CStr,
             request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {
@@ -129,8 +129,8 @@ fn call_with_dynamic_res_and_less_buf_size() -> Result<(), Box<dyn std::error::E
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static str,
-            _fn_name: &'static str,
+            _service_name: &'static CStr,
+            _fn_name: &'static CStr,
             request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {
@@ -188,8 +188,8 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn std::erro
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static str,
-            _fn_name: &'static str,
+            _service_name: &'static CStr,
+            _fn_name: &'static CStr,
             request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {
@@ -251,8 +251,8 @@ fn call_with_dynamic_res_and_too_many_read() -> Result<(), Box<dyn std::error::E
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static str,
-            _fn_name: &'static str,
+            _service_name: &'static CStr,
+            _fn_name: &'static CStr,
             request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {

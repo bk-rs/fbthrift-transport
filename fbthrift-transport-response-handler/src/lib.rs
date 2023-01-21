@@ -8,8 +8,8 @@ pub trait ResponseHandler: Clone {
 
     fn try_make_static_response_bytes(
         &mut self,
-        service_name: &'static str,
-        fn_name: &'static str,
+        service_name: &'static [u8],
+        fn_name: &'static [u8],
         request_bytes: &[u8],
     ) -> Result<Option<Vec<u8>>, IoError>;
 
@@ -27,8 +27,8 @@ impl ResponseHandler for MockResponseHandler {
 
     fn try_make_static_response_bytes(
         &mut self,
-        _service_name: &'static str,
-        _fn_name: &'static str,
+        _service_name: &'static [u8],
+        _fn_name: &'static [u8],
         _request_bytes: &[u8],
     ) -> Result<Option<Vec<u8>>, IoError> {
         Ok(None)
@@ -48,7 +48,7 @@ mod tests {
         let mut h = MockResponseHandler;
 
         assert_eq!(
-            h.try_make_static_response_bytes("my_service", "my_fn", &b""[..])?,
+            h.try_make_static_response_bytes(b"my_service", b"my_fn", &b""[..])?,
             None
         );
 

@@ -2,6 +2,7 @@
 
 #[cfg(test)]
 mod transport_impl_async_io_tests {
+    use core::ffi::CStr;
     use std::{
         io::{Error as IoError, ErrorKind as IoErrorKind},
         net::TcpListener,
@@ -10,7 +11,6 @@ mod transport_impl_async_io_tests {
     };
 
     use bytes::Bytes;
-    use const_cstr::const_cstr;
     use fbthrift::Transport as _;
 
     use async_executor::{Executor, Task};
@@ -31,8 +31,8 @@ mod transport_impl_async_io_tests {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static str,
-            _fn_name: &'static str,
+            _service_name: &'static [u8],
+            _fn_name: &'static [u8],
             _request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(None)
@@ -95,9 +95,10 @@ mod transport_impl_async_io_tests {
                 for n in 0..10_usize {
                     let cursor = transport
                         .call(
-                            &const_cstr!("my_service"),
-                            &const_cstr!("my_fn"),
+                            CStr::from_bytes_with_nul(b"my_service\0").expect(""),
+                            CStr::from_bytes_with_nul(b"my_fn\0").expect(""),
                             Bytes::from("abcde"),
+                            Default::default(),
                         )
                         .await
                         .map_err(|err| IoError::new(IoErrorKind::Other, err))?;

@@ -1,12 +1,12 @@
 use super::{block_on, Sleep};
 
+use core::ffi::CStr;
 use std::{
     io::Error as IoError,
     sync::{Arc, Mutex},
 };
 
 use bytes::Bytes;
-use const_cstr::const_cstr;
 use fbthrift_transport::{transport::Call, AsyncTransportConfiguration};
 use fbthrift_transport_response_handler::ResponseHandler;
 use futures_util::io::Cursor;
@@ -19,8 +19,8 @@ fn call_with_static_res() -> Result<(), Box<dyn std::error::Error>> {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static str,
-            _fn_name: &'static str,
+            _service_name: &'static [u8],
+            _fn_name: &'static [u8],
             request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"static" {
@@ -48,9 +48,10 @@ fn call_with_static_res() -> Result<(), Box<dyn std::error::Error>> {
         let req = Bytes::from("static");
         let call = Call::<_, Sleep, _>::new(
             stream.clone(),
-            const_cstr!("my_service"),
-            const_cstr!("my_fn"),
+            CStr::from_bytes_with_nul(b"my_service\0").expect(""),
+            CStr::from_bytes_with_nul(b"my_fn\0").expect(""),
             req,
+            Default::default(),
             c.clone(),
         );
 
@@ -71,8 +72,8 @@ fn call_with_dynamic_res() -> Result<(), Box<dyn std::error::Error>> {
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static str,
-            _fn_name: &'static str,
+            _service_name: &'static [u8],
+            _fn_name: &'static [u8],
             request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {
@@ -104,9 +105,10 @@ fn call_with_dynamic_res() -> Result<(), Box<dyn std::error::Error>> {
         let req = Bytes::from("dynamic");
         let call = Call::<_, Sleep, _>::new(
             stream.clone(),
-            const_cstr!("my_service"),
-            const_cstr!("my_fn"),
+            CStr::from_bytes_with_nul(b"my_service\0").expect(""),
+            CStr::from_bytes_with_nul(b"my_fn\0").expect(""),
             req,
+            Default::default(),
             c.clone(),
         );
 
@@ -127,8 +129,8 @@ fn call_with_dynamic_res_and_less_buf_size() -> Result<(), Box<dyn std::error::E
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static str,
-            _fn_name: &'static str,
+            _service_name: &'static [u8],
+            _fn_name: &'static [u8],
             request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {
@@ -162,9 +164,10 @@ fn call_with_dynamic_res_and_less_buf_size() -> Result<(), Box<dyn std::error::E
         let req = Bytes::from("dynamic");
         let call = Call::<_, Sleep, _>::new(
             stream.clone(),
-            const_cstr!("my_service"),
-            const_cstr!("my_fn"),
+            CStr::from_bytes_with_nul(b"my_service\0").expect(""),
+            CStr::from_bytes_with_nul(b"my_fn\0").expect(""),
             req,
+            Default::default(),
             c.clone(),
         );
 
@@ -185,8 +188,8 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn std::erro
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static str,
-            _fn_name: &'static str,
+            _service_name: &'static [u8],
+            _fn_name: &'static [u8],
             request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {
@@ -220,9 +223,10 @@ fn call_with_dynamic_res_and_less_max_buf_size() -> Result<(), Box<dyn std::erro
         let req = Bytes::from("dynamic");
         let call = Call::<_, Sleep, _>::new(
             stream.clone(),
-            const_cstr!("my_service"),
-            const_cstr!("my_fn"),
+            CStr::from_bytes_with_nul(b"my_service\0").expect(""),
+            CStr::from_bytes_with_nul(b"my_fn\0").expect(""),
             req,
+            Default::default(),
             c.clone(),
         );
 
@@ -247,8 +251,8 @@ fn call_with_dynamic_res_and_too_many_read() -> Result<(), Box<dyn std::error::E
     impl ResponseHandler for FooResponseHandler {
         fn try_make_static_response_bytes(
             &mut self,
-            _service_name: &'static str,
-            _fn_name: &'static str,
+            _service_name: &'static [u8],
+            _fn_name: &'static [u8],
             request_bytes: &[u8],
         ) -> Result<Option<Vec<u8>>, IoError> {
             Ok(if request_bytes == b"dynamic" {
@@ -280,9 +284,10 @@ fn call_with_dynamic_res_and_too_many_read() -> Result<(), Box<dyn std::error::E
         let req = Bytes::from("dynamic");
         let call = Call::<_, Sleep, _>::new(
             stream.clone(),
-            const_cstr!("my_service"),
-            const_cstr!("my_fn"),
+            CStr::from_bytes_with_nul(b"my_service\0").expect(""),
+            CStr::from_bytes_with_nul(b"my_fn\0").expect(""),
             req,
+            Default::default(),
             c.clone(),
         );
 

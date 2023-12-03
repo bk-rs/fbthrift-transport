@@ -3,3 +3,5 @@ members = [
     "fbthrift-transport",
     "fbthrift-transport-response-handler",
 ]
+resolver = "2"
+

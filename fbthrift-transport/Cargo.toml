@@ -24,7 +24,7 @@ impl_async_io = ["async-io", "async-sleep/impl_async_io"]
 [dependencies]
 fbthrift-transport-response-handler = { version = "0.7", path = "../fbthrift-transport-response-handler" }
 
-fbthrift = { version = "=0.0.7", default-features = false, package = "fbthrift-git" }
+fbthrift = { version = "=0.0.8", default-features = false, package = "fbthrift-git" }
 bytes = { version = "1", default-features = false }
 anyhow = { version = "1", default-features = false }
 

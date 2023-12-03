@@ -1,6 +1,6 @@
 [package]
 name = "fbthrift-transport"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["vkill <vkill.net@gmail.com>"]
 edition = "2021"
 description = "fbthrift transport."

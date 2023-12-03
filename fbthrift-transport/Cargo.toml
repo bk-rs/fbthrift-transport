@@ -31,14 +31,16 @@ anyhow = { version = "1", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["io"] }
 async-sleep = { version = "0.4", default-features = false, features = ["rw"] }
 
-tokio = { version = "1", default-features = false, features = ["net"], optional = true }
+tokio = { version = "1", default-features = false, features = [
+    "net",
+], optional = true }
 async-compat = { version = "0.2", default-features = false, optional = true }
 async-io = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-util"] }
 
-futures-lite = { version = "1" }
+futures-lite = { version = "2" }
 async-executor = { version = "1" }
 
 [package.metadata.cargo-all-features]
